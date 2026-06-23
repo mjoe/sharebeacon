@@ -1,57 +1,37 @@
 import SwiftUI
 
 struct LogsView: View {
-    @EnvironmentObject private var shareManager: SMBShareManager
-
-    private var sortedLogs: [SMBShareManager.ReconnectionLog] {
-        // Return sorted by timestamp (newest first)
-        shareManager.reconnectionLogs.sorted { $0.timestamp > $1.timestamp }
-    }
+    @EnvironmentObject private var manager: SMBShareManager
 
     var body: some View {
-        VStack {
-            Table(sortedLogs) {
-                TableColumn("Time") { log in
-                    Text(log.formattedTimestamp)
+        VStack(spacing: 0) {
+            HStack {
+                Text("Recent Activity")
+                    .font(.title2.bold())
+                Spacer()
+                Button("Open Log File") {
+                    manager.openLog()
                 }
-                .width(min: 150, ideal: 180)
+            }
+            .padding()
 
-                TableColumn("Share") { log in
-                    Text(log.displayShareName)
-                }
-                .width(min: 100, ideal: 120)
+            Divider()
 
-                TableColumn("URL") { log in
-                    Text(log.shareURL)
+            Table(manager.logs.reversed()) {
+                TableColumn("Time") { entry in
+                    Text(entry.timestamp.formatted(date: .omitted, time: .standard))
                 }
-                .width(min: 150, ideal: 200)
+                .width(min: 90, ideal: 110)
 
-                TableColumn("Mount Point") { log in
-                    Text(log.mountPoint)
+                TableColumn("Level") { entry in
+                    Text(entry.level.rawValue)
                 }
-                .width(min: 150, ideal: 200)
+                .width(min: 70, ideal: 80)
 
-                TableColumn("Status") { log in
-                    HStack {
-                        Image(systemName: log.success ? "checkmark.circle.fill" : "xmark.circle.fill")
-                            .foregroundColor(log.success ? .green : .red)
-                        Text(log.success ? "Success" : "Failed")
-                    }
+                TableColumn("Message") { entry in
+                    Text(entry.message)
                 }
-                .width(min: 80, ideal: 100)
-
-                TableColumn("Message") { log in
-                    Text(log.message)
-                }
-                .width(min: 200, ideal: 300)
             }
         }
-    }
-}
-
-struct LogsView_Previews: PreviewProvider {
-    static var previews: some View {
-        LogsView()
-            .environmentObject(SMBShareManager())
     }
 }

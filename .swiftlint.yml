@@ -13,7 +13,6 @@ only_rules:
   - comma
   - compiler_protocol_init
   - computed_accessors_order
-  - conditional_returns_on_newline
   - contains_over_filter_count
   - contains_over_filter_is_empty
   - contains_over_first_not_nil
@@ -81,7 +80,7 @@ only_rules:
   - number_separator
   - opening_brace
   - operator_usage_whitespace
-  - operator_whitespace
+  - function_name_whitespace
   - orphaned_doc_comment
   - overridden_super_call
   - prefer_self_type_over_type_of_self
@@ -97,7 +96,7 @@ only_rules:
   - redundant_discardable_let
   - redundant_nil_coalescing
   - redundant_objc_attribute
-  - redundant_optional_initialization
+  - implicit_optional_initialization
   - redundant_set_access_control
   - redundant_string_enum_value
   - redundant_type_annotation
@@ -111,7 +110,6 @@ only_rules:
   - strong_iboutlet
   - superfluous_disable_command
   - switch_case_alignment
-  - switch_case_on_newline
   - syntactic_sugar
   - test_case_accessibility
   - toggle_bool
@@ -153,7 +151,7 @@ identifier_name:
     error: 2
   validates_start_with_lowercase: error
 deployment_target:
-  macOS_deployment_target: "11.0"
+  macOS_deployment_target: "13.0"
 custom_rules:
   swiftui_state_private:
     regex: '@(State|StateObject|ObservedObject|EnvironmentObject)\s+var'

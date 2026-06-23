@@ -73,7 +73,6 @@
 				B56294F52D949F6D008CEE4F /* Sources */,
 				B56294F62D949F6D008CEE4F /* Frameworks */,
 				B56294F72D949F6D008CEE4F /* Resources */,
-				B58EBD8E2D972B5E00DCEB07 /* Increment Build */,
 				B58EBD902D972B8300DCEB07 /* Run Swiftlint */,
 			);
 			buildRules = (
@@ -320,8 +319,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"jockey/Preview Content\"";
-				DEVELOPMENT_TEAM = ZN3SU624TP;
-				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -355,8 +353,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"jockey/Preview Content\"";
-				DEVELOPMENT_TEAM = ZN3SU624TP;
-				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -406,8 +403,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sindresorhus/LaunchAtLogin-Modern";
 			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 1.1.0;
+				kind = revision;
+				revision = a04ec1c363be3627734f6dad757d82f5d4fa8fcc;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

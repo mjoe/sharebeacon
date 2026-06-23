@@ -15,9 +15,13 @@ update:
 	sudo bundle update fastlane
 	bundle exec fastlane update_plugins
 
+.PHONY: test
+test:
+	swift test
+
 .PHONY: local
 local:
-	bundle exec fastlane mac local
+	./scripts/build-release.sh
 
 .PHONY: beta
 beta:
@@ -37,3 +41,4 @@ clean:
 	# Reset defaults
 	defaults delete com.mjoe.sharebeacon 2>/dev/null || true
 	@echo "App has been reset to simulate a fresh installation"
+	rm -rf build .build

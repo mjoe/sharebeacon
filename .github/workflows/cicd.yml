@@ -1,47 +1,48 @@
-name: CI/CD
+name: Build
 
 on:
   push:
-    branches:
-      - main
-      - staging
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
 
 jobs:
-  build:
-    name: Build & Release
+  test-and-build:
     runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
+      - name: Unit tests
+        run: swift test
+
+      - name: Build universal release
+        run: ./scripts/build-release.sh
+
+      - name: Validate bundle
+        run: |
+          plutil -lint build/DerivedData/Build/Products/Release/MountJockey.app/Contents/Info.plist
+          codesign --verify --deep --strict build/DerivedData/Build/Products/Release/MountJockey.app
+          lipo -archs build/DerivedData/Build/Products/Release/MountJockey.app/Contents/MacOS/MountJockey
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: MountJockey
+          path: build/MountJockey.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test-and-build
+    runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v3
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          fetch-depth: 0
-
-      - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+          name: MountJockey
+      - uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8
         with:
-          ruby-version: '3.0'
-          bundler-cache: true
-
-      - name: Fastlane Build - Beta
-        if: github.ref == 'refs/heads/staging'
-        uses: maierj/fastlane-action@v3.0.0
-        with:
-          lane: 'beta'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Fastlane Build - Production
-        if: github.ref == 'refs/heads/main'
-        uses: maierj/fastlane-action@v3.0.0
-        with:
-          lane: 'production'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: MountJockey.zip
+          generate_release_notes: true

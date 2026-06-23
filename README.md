@@ -1,180 +1,60 @@
-<div align="center">
-    <img src="art/icon/Icon-1024.png" alt="logo" width="250" height="auto" />
-    <h1>ShareBeacon for macOS</h1>
-    <p>A reliable SMB mount and Finder sidebar companion for macOS Tahoe (26), built in Swift and SwiftUI.</p>
-    <p></p>
-</div>
+# ShareBeacon
 
-<div align="center">
-    <p>
-        <a href="https://github.com/mjoe/sharebeacon/actions/workflows/cicd.yml">
-            <img src="https://github.com/mjoe/sharebeacon/actions/workflows/cicd.yml/badge.svg" alt="build" />
-        </a>
-        <a href="https://github.com/mjoe/sharebeacon/actions/workflows/swiftlint.yml">
-            <img src="https://github.com/mjoe/sharebeacon/actions/workflows/swiftlint.yml/badge.svg" alt="lint" />
-        </a>
-        <a href="https://github.com/mjoe/sharebeacon/releases">
-            <img src="https://img.shields.io/github/downloads/mjoe/sharebeacon/total" alt="downloads" />
-        </a>
-        <a href="https://github.com/mjoe/sharebeacon/graphs/contributors">
-            <img src="https://img.shields.io/github/contributors/mjoe/sharebeacon" alt="contributors" />
-        </a>
-        <a href="https://github.com/mjoe/sharebeacon/network/members">
-            <img src="https://img.shields.io/github/forks/mjoe/sharebeacon" alt="forks" />
-        </a>
-        <a href="https://github.com/mjoe/sharebeacon/stargazers">
-            <img src="https://img.shields.io/github/stars/mjoe/sharebeacon" alt="stars" />
-        </a>
-        <a href="https://github.com/mjoe/sharebeacon/issues/">
-            <img src="https://img.shields.io/github/issues/mjoe/sharebeacon" alt="open issues" />
-        </a>
-        <a href="https://github.com/mjoe/sharebeacon/blob/main/LICENSE">
-            <img src="https://img.shields.io/github/license/mjoe/sharebeacon.svg" alt="license" />
-        </a>
-    </p>
-</div>
+ShareBeacon is a macOS Tahoe (26) menu-bar application that keeps SMB shares
+available over LANs, Tailscale, WireGuard, OpenVPN, and other routed networks.
+It stores credentials in the login Keychain and is designed to restore Finder
+sidebar favorites after a share reconnects.
 
-<div align="center">
-    <h4>
-        <a href="#floppy_disk-download">Download Latest Version</a>
-        <span> · </span>
-        <a href="https://github.com/mjoe/sharebeacon/issues">Report a Bug</a>
-        <span> · </span>
-        <a href="https://github.com/mjoe/sharebeacon/issues">Request a Feature</a>
-    </h4>
-</div>
+## Features
 
-<br />
+- Multiple independently configured SMB shares
+- Serialized mount operations and endpoint readiness checks
+- Automatic recovery after login, network changes, sleep/wake, and disconnects
+- Credentials kept out of URLs, configuration, process arguments, and logs
+- User-owned or `/Volumes` mount points
+- Finder sidebar favorite repair with a safe no-op fallback
+- macOS 26 or newer, Apple Silicon and Intel
 
-<!-- Table of Contents -->
+## Requirements
 
-# :notebook_with_decorative_cover: Table of Contents
+- macOS Tahoe 26 or newer
+- Xcode or Xcode Command Line Tools
+- Access to an SMB server
 
-- [About the Project](#star2-about-the-project)
-  - [Screenshot](#camera-screenshot)
-  - [Tech Stack](#space_invader-tech-stack)
-  - [Features](#dart-features)
-- [Download](#floppy_disk-download)
-- [Contributing](#memo-contributing)
-- [Changelog](https://github.com/othyn/macos-jockey/releases)
-- [License](#warning-license)
-- [Acknowledgements](#gem-acknowledgements)
+## Build and Test
 
-<!-- About the Project -->
+```bash
+swift test
+./scripts/build-release.sh
+```
 
-## :star2: About the Project
+The release build is universal and currently ad-hoc signed. Notarized
+distribution is planned. The application does not require Full Disk Access.
 
-ShareBeacon is a macOS menu bar utility that keeps SMB network shares mounted and restores their Finder sidebar favorites after reconnects.
+## Security
 
-Designed as an Open Source alternative to [AutoMounter](https://www.pixeleyes.co.nz/automounter/).
+Passwords are stored as generic-password Keychain items and passed to NetFS
+directly in process memory. The SMB URL contains only the host and share name.
+Share configuration is stored in UserDefaults without passwords. ShareBeacon
+does not use telemetry, analytics, or external APIs.
 
-<!-- Screenshots -->
+## Finder Favorites
 
-### :camera: Screenshot
+Finder sidebar state is managed by macOS rather than a stable public API.
+ShareBeacon therefore treats favorite repair as best-effort: it preserves the
+user's configured mount path, attempts a non-destructive repair after mounting,
+and never makes mounting depend on sidebar manipulation.
 
-<div align="center">
-    <img alt="screenshot" src="art/screenshot.png" width="70%" />
-</div>
+## Credits
 
-<!-- TechStack -->
+ShareBeacon is an independent project derived from
+[othyn/macos-jockey](https://github.com/othyn/macos-jockey), originally created
+by Ben Tindall.
 
-### :space_invader: Tech Stack
-
-<ul>
-    <li>Swift</li>
-    <li>Swift UI</li>
-</ul>
-
-<!-- Features -->
-
-### :dart: Features
-
-- **Menu Bar Integration**: Runs efficiently in the menu bar with minimal resource usage
-- **Connection Status**: Shows connection status and uptime for all configured shares
-- **Auto-reconnect**: Automatically attempts to reconnect shares when they disconnect
-- **Configurable Polling**: Set how frequently Jockey checks connection status
-- **Custom Mount Points**: Configure shares with specific mount points
-- **System Integration**: Detects existing system SMB mounts
-
-#### Usage
-
-1. Launch Jockey, and it will appear in your menu bar
-2. Click the menu bar icon to see the status of your shares
-3. Open Settings to add or manage SMB shares
-4. Adjust the polling interval to control how often Jockey checks your connections
-5. Accept the prompt to allow Finder permissions, as is required to allow Jockey to mount shares on your behalf
-
-<!-- Download -->
-
-## :floppy_disk: Download
-
-**Target platform:** macOS Tahoe (26) and newer. Releases will be published on the [releases page](https://github.com/mjoe/sharebeacon/releases).
-
-### Using the app for the first time
-
-When first using the app, you will need to right click the app and click 'Open', then on the macOS popup window select 'Open' again to trust this version of the app going forward. This is as at the moment I don't have a paid Apple developer account in order to notarize the app.
-
-#### First time use for macOS Tahoe (26) users
-
-If you are using macOS Sequoia, there are increased barriers in place to stop you running un-notarized apps. To open the app you will need to do the following;
-
-1. Try to open the app, and when presented with the options to 'Move to trash' or otherwise, close out of that prompt:
-
-<div align=center>
-    <img width="50%" src="art/ref/0_readme_macOS_error.png"/>
-</div>
-
-2. Head over to System Settings > Privacy & Security > Security, and scroll all the way at the bottom, you should see the following:
-
-<div align=center>
-    <img width="100%" src="art/ref/1_readme_macOS_settings.png"/>
-</div>
-
-3. Click on the 'Open Anyway' button.
-4. When prompted with the following dialogue, click 'Open Anyway':
-
-<div align=center>
-    <img width="40%" src="art/ref/2_readme_macOS_prompt.png"/>
-</div>
-
-5. Head back to the Jockey app and try opening it again, it should now work as normal.
-6. When Jockey first attempts to mount a share, it will pop-up and prompt for Finder access, which you will need to grant in order for Jockey to mount shares in your behalf.
-    - Alternatively, you can grant Jockey 'Full Disk Access' within System Settings > Privacy & Security, but I will leave that down to your best judgement.
-
-<!-- Contributing -->
-
-## :memo: Contributing
-
-See the [contribution guide](CONTRIBUTING.md) on how to get started. Thank you for contributing!
-
-Detailed within that guide are steps on how...
-
-- ... issues should be used.
-- ... to setup the project.
-- ... to contribute new languages via the app's localisation support.
-- ... branches should be used.
-- ... commits should be formatted.
-- ... pull requests should be submitted.
-- ... the build process works and the automation that drives it.
-
-<!-- License -->
-
-## :warning: License
-
-Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
-
-<!-- Acknowledgments -->
-
-## :gem: Acknowledgements
-
-ShareBeacon is an independent project derived from [othyn/macos-jockey](https://github.com/othyn/macos-jockey).
-
-- Ben Tindall: original author of Jockey for macOS
-- Valentine Ubani Mayaki: security-focused fork and MountJockey improvements
+- Ben Tindall: original Jockey for macOS author
+- Valentine Ubani Mayaki: security-focused MountJockey fork and improvements
 - Michael Joe: ShareBeacon maintainer and further development
 
-Useful resources and libraries that have been used in the making of this project.
+## License
 
-- Readme: [shields.io](https://shields.io/)
-- Readme: [ikatyang/emoji-cheat-sheet](https://github.com/ikatyang/emoji-cheat-sheet)
-- Readme: [Louis3797/awesome-readme-template](https://github.com/Louis3797/awesome-readme-template)
+MIT. See [LICENSE](LICENSE).
