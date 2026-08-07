@@ -3,6 +3,16 @@ import Foundation
 import Network
 import Observation
 
+private actor MountOperationRunner {
+    func mount(_ mounter: ShareMounting, share: ShareConfiguration, password: String) throws {
+        try mounter.mount(share, password: password)
+    }
+
+    func unmount(_ mounter: ShareMounting, share: ShareConfiguration) throws {
+        try mounter.unmount(share)
+    }
+}
+
 enum ShareRuntimeState: Equatable {
     case disabled
     case unmounted
@@ -53,8 +63,9 @@ final class SMBShareManager: NSObject {
     private let reachabilityTimeout: TimeInterval = 120
 
     @ObservationIgnored private var networkMonitor: NWPathMonitor?
-    @ObservationIgnored private var retryTimer: Timer?
+    @ObservationIgnored private var retryTask: Task<Void, Never>?
     @ObservationIgnored private var operations: [UUID: Task<Void, Never>] = [:]
+    @ObservationIgnored private let operationRunner = MountOperationRunner()
 
     init(
         credentialStore: CredentialStoring = KeychainCredentialStore.shared,
@@ -75,7 +86,7 @@ final class SMBShareManager: NSObject {
 
     deinit {
         networkMonitor?.cancel()
-        retryTimer?.invalidate()
+        retryTask?.cancel()
         operations.values.forEach { $0.cancel() }
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
@@ -204,9 +215,7 @@ final class SMBShareManager: NSObject {
                 guard let password = try credentialStore.password(for: share), !password.isEmpty else {
                     throw ShareBeaconError.credentialMissing
                 }
-                try await Task.detached(priority: .utility) {
-                    try self.mounter.mount(share, password: password)
-                }.value
+                try await operationRunner.mount(mounter, share: share, password: password)
                 states[share.id] = .mounted
                 appendLog("Mounted \(share.name) at \(share.normalizedMountPoint).")
             } catch {
@@ -235,9 +244,7 @@ final class SMBShareManager: NSObject {
             }
 
             do {
-                try await Task.detached(priority: .utility) {
-                    try self.mounter.unmount(share)
-                }.value
+                try await operationRunner.unmount(mounter, share: share)
                 if let current = shares.first(where: { $0.id == share.id }) {
                     states[share.id] = current.isEnabled ? .unmounted : .disabled
                 } else {
@@ -317,11 +324,11 @@ final class SMBShareManager: NSObject {
             object: nil
         )
 
-        retryTimer = Timer.scheduledTimer(
-            withTimeInterval: retryInterval,
-            repeats: true
-        ) { [weak self] _ in
-            Task { @MainActor in
+        retryTask?.cancel()
+        retryTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(retryInterval))
+                guard !Task.isCancelled else { return }
                 self?.mountAll()
             }
         }
