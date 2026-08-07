@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# https://github.com/xotahal/fastlane-plugin-semantic_release/blob/f93db152f83842d99344f6db2d93b487cb59df4b/lib/fastlane/plugin/semantic_release/helper/semantic_release_helper.rb#L10
+# Keep commit subjects machine-readable for changelogs and review tooling.
 COMMIT_MESSAGE=$(cat ${1})
 VALID_COMMIT_PREFIXES="docs|fix|feat|chore|style|refactor|perf|test"
 VALID_COMMIT_PREFIX_REGEX="^(${VALID_COMMIT_PREFIXES})(\((.*)\))?(!?)\: (.*)$"
