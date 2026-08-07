@@ -1,4 +1,5 @@
-@preconcurrency import CoreServices
+@preconcurrency import ApplicationServices
+import AppKit
 import Foundation
 
 protocol FinderSidebarRepairing: Sendable {
@@ -7,39 +8,39 @@ protocol FinderSidebarRepairing: Sendable {
 
 struct FinderSidebarRepairer: FinderSidebarRepairing {
     func restoreFavorite(for share: ShareConfiguration) -> Bool {
-        guard let list = LSSharedFileListCreate(
-            nil,
-            kLSSharedFileListFavoriteItems.takeUnretainedValue(),
-            nil
-        )?.takeUnretainedValue() else {
+        let accessibilityOptions = [
+            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
+        ] as CFDictionary
+        guard AXIsProcessTrustedWithOptions(accessibilityOptions) else {
             return false
         }
 
-        var seed: UInt32 = 0
-        guard let snapshot = LSSharedFileListCopySnapshot(list, &seed)?.takeUnretainedValue() else {
-            return false
-        }
+        let path = escapeAppleScriptString(share.normalizedMountPoint)
+        let script = """
+        tell application "Finder"
+            activate
+            reveal POSIX file "\(path)"
+        end tell
+        tell application "System Events"
+            tell process "Finder"
+                try
+                    click menu item "Add to Sidebar" of menu "File" of menu bar 1
+                on error
+                    click menu item "Zur Seitenleiste hinzufügen" of menu "Ablage" of menu bar 1
+                end try
+            end tell
+        end tell
+        """
 
-        let mountURL = URL(fileURLWithPath: share.normalizedMountPoint, isDirectory: true)
-        for item in snapshot as NSArray {
-            let item = item as! LSSharedFileListItem
-            var error: Unmanaged<CFError>?
-            guard let resolved = LSSharedFileListItemCopyResolvedURL(item, 0, &error)?.takeUnretainedValue() else {
-                continue
-            }
-            if (resolved as URL).standardizedFileURL.path == mountURL.standardizedFileURL.path {
-                return false
-            }
-        }
+        var error: NSDictionary?
+        guard let appleScript = NSAppleScript(source: script) else { return false }
+        appleScript.executeAndReturnError(&error)
+        return error == nil
+    }
 
-        return LSSharedFileListInsertItemURL(
-            list,
-            kLSSharedFileListItemLast.takeUnretainedValue(),
-            share.name as CFString,
-            nil,
-            mountURL as CFURL,
-            nil,
-            nil
-        ) != nil
+    private func escapeAppleScriptString(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
     }
 }
