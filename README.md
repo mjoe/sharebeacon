@@ -34,6 +34,10 @@ swift test
 ./scripts/build-release.sh
 ```
 
+Use `./scripts/build-release.sh --clean` for a clean derived-data build or
+`./scripts/build-release.sh --skip-sign` when only an unsigned local artifact
+is needed. Release ZIPs include a SHA-256 checksum.
+
 The release build is universal and currently ad-hoc signed. Notarized
 distribution is planned. The application does not require Full Disk Access.
 
