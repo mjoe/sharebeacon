@@ -103,14 +103,14 @@ struct SettingsView: View {
     private var generalView: some View {
         Form {
             Section("Startup") {
-                LaunchAtLogin.Toggle("Launch MountJockey at login")
-                Text("MountJockey stays in the menu bar and reacts to network and wake events.")
+                    LaunchAtLogin.Toggle("Launch ShareBeacon at login")
+                    Text("ShareBeacon stays in the menu bar and reacts to network and wake events.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Section("Connectivity") {
-                Text("MountJockey probes DNS and TCP port 445 on each SMB host. This works over Tailscale, WireGuard, OpenVPN, ordinary LANs, and other routed networks.")
+                    Text("ShareBeacon probes DNS and TCP port 445 on each SMB host. This works over Tailscale, WireGuard, OpenVPN, ordinary LANs, and other routed networks.")
             }
 
             Section("Diagnostics") {

@@ -11,7 +11,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		B56294F92D949F6D008CEE4F /* jockey.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = jockey.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B56294F92D949F6D008CEE4F /* ShareBeacon.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShareBeacon.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -25,7 +25,7 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		B56294FB2D949F6D008CEE4F /* jockey */ = {
+		B56294FB2D949F6D008CEE4F /* ShareBeacon */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				B58EBD912D97374200DCEB07 /* Exceptions for "jockey" folder in "jockey" target */,
@@ -66,7 +66,7 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		B56294F82D949F6D008CEE4F /* jockey */ = {
+		B56294F82D949F6D008CEE4F /* ShareBeacon */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = B56295082D949F6E008CEE4F /* Build configuration list for PBXNativeTarget "jockey" */;
 			buildPhases = (
@@ -82,12 +82,12 @@
 			fileSystemSynchronizedGroups = (
 				B56294FB2D949F6D008CEE4F /* jockey */,
 			);
-			name = jockey;
+			name = ShareBeacon;
 			packageProductDependencies = (
 				B58EBD962D973ABE00DCEB07 /* LaunchAtLogin */,
 			);
-			productName = jockey;
-			productReference = B56294F92D949F6D008CEE4F /* jockey.app */;
+			productName = ShareBeacon;
+			productReference = B56294F92D949F6D008CEE4F /* ShareBeacon.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -378,7 +378,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		B56294F42D949F6D008CEE4F /* Build configuration list for PBXProject "jockey" */ = {
+		B56294F42D949F6D008CEE4F /* Build configuration list for PBXProject "ShareBeacon" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B56295062D949F6E008CEE4F /* Debug */,
@@ -387,7 +387,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B56295082D949F6E008CEE4F /* Build configuration list for PBXNativeTarget "jockey" */ = {
+		B56295082D949F6E008CEE4F /* Build configuration list for PBXNativeTarget "ShareBeacon" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B56295092D949F6E008CEE4F /* Debug */,

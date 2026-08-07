@@ -2,12 +2,12 @@ import AppKit
 import SwiftUI
 
 @main
-struct MountJockeyApp: App {
+struct ShareBeaconApp: App {
     @StateObject private var shareManager = SMBShareManager()
 
     var body: some Scene {
-        MenuBarExtra("MountJockey", systemImage: menuBarSymbol) {
-            Text("MountJockey")
+        MenuBarExtra("ShareBeacon", systemImage: menuBarSymbol) {
+            Text("ShareBeacon")
                 .font(.headline)
 
             Divider()
@@ -67,7 +67,7 @@ struct MountJockeyApp: App {
 
             Divider()
 
-            Button("Quit MountJockey") {
+            Button("Quit ShareBeacon") {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")

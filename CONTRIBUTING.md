@@ -1,6 +1,6 @@
 # Contributing
 
-MountJockey accepts focused pull requests against `main`.
+ShareBeacon accepts focused pull requests against `main`.
 
 Before opening a pull request:
 

@@ -34,7 +34,7 @@ prod:
 .PHONY: clean
 clean:
 	# Clean Xcode build folder
-	xcodebuild clean -project jockey.xcodeproj -scheme jockey
+	xcodebuild clean -project jockey.xcodeproj -scheme ShareBeacon
 	# Remove app preferences and state
 		rm -rf ~/Library/Preferences/com.mjoe.sharebeacon.plist
 		rm -rf ~/Library/Saved\ Application\ State/com.mjoe.sharebeacon.savedState

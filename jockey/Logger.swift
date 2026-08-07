@@ -31,15 +31,15 @@ final class AppLogger: @unchecked Sendable {
     static let shared = AppLogger()
 
     private let systemLogger = Logger(
-        subsystem: "com.valmayaki.mountjockey",
+        subsystem: "com.mjoe.sharebeacon",
         category: "mount"
     )
-    private let queue = DispatchQueue(label: "com.valmayaki.mountjockey.log")
+    private let queue = DispatchQueue(label: "com.mjoe.sharebeacon.log")
     private let maximumBytes: UInt64 = 2 * 1_024 * 1_024
 
     var logURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Logs/mountjockey.log")
+            .appendingPathComponent("Library/Logs/sharebeacon.log")
     }
 
     func write(_ message: String, level: LogLevel = .info) {
