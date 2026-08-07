@@ -7,12 +7,30 @@ protocol FinderSidebarRepairing: Sendable {
 
 struct FinderSidebarRepairer: FinderSidebarRepairing {
     func restoreFavorite(for share: ShareConfiguration) -> Bool {
-        guard let list = LSSharedFileListCreate(
-            nil,
-            kLSSharedFileListFavoriteVolumes.takeUnretainedValue(),
-            nil
-        )?.takeUnretainedValue() else {
-            logError("Could not open Finder Favorite Volumes list.")
+        let mountURL = URL(fileURLWithPath: share.normalizedMountPoint, isDirectory: true)
+        let volumeResult = restore(
+            mountURL: mountURL,
+            name: share.name,
+            listType: kLSSharedFileListFavoriteVolumes.takeUnretainedValue(),
+            label: "Favorite Volumes"
+        )
+        let itemResult = restore(
+            mountURL: mountURL,
+            name: share.name,
+            listType: kLSSharedFileListFavoriteItems.takeUnretainedValue(),
+            label: "Favorites"
+        )
+        return volumeResult || itemResult
+    }
+
+    private func restore(
+        mountURL: URL,
+        name: String,
+        listType: CFString,
+        label: String
+    ) -> Bool {
+        guard let list = LSSharedFileListCreate(nil, listType, nil)?.takeUnretainedValue() else {
+            logError("Could not open Finder \(label) list.")
             return false
         }
 
@@ -22,7 +40,6 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
             return false
         }
 
-        let mountURL = URL(fileURLWithPath: share.normalizedMountPoint, isDirectory: true)
         for item in snapshot as NSArray {
             let item = item as! LSSharedFileListItem
             var error: Unmanaged<CFError>?
@@ -37,14 +54,14 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
         let inserted = LSSharedFileListInsertItemURL(
             list,
             kLSSharedFileListItemLast.takeUnretainedValue(),
-            share.name as CFString,
+            name as CFString,
             nil,
             mountURL as CFURL,
             nil,
             nil
         ) != nil
         if !inserted {
-            logError("Finder rejected the Favorite Volumes insertion.")
+            logError("Finder rejected the \(label) insertion.")
         }
         return inserted
     }
