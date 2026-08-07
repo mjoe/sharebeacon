@@ -53,7 +53,7 @@ by Ben Tindall.
 
 - Ben Tindall: original Jockey for macOS author
 - Valentine Ubani Mayaki: security-focused MountJockey fork and improvements
-- Michael Joe: ShareBeacon maintainer and further development
+- ShareBeacon maintainers: further independent development
 
 ## License
 
