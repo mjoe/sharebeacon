@@ -10,7 +10,7 @@ let package = Package(
     targets: [
         .target(
             name: "ShareBeaconCore",
-            path: "jockey",
+            path: "ShareBeacon",
             exclude: [
                 "Assets.xcassets",
                 "ContentView.swift",
@@ -20,8 +20,8 @@ let package = Package(
                 "Preview Content",
                 "SettingsView.swift",
                 "SMBShareManager.swift",
-                "jockey.entitlements",
-                "jockeyApp.swift"
+                "sharebeacon.entitlements",
+                "ShareBeaconApp.swift"
             ],
             sources: ["MountCore.swift"]
         ),

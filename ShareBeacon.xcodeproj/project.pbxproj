@@ -15,12 +15,12 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		B58EBD912D97374200DCEB07 /* Exceptions for "jockey" folder in "jockey" target */ = {
+		B58EBD912D97374200DCEB07 /* Exceptions for "ShareBeacon" folder in "ShareBeacon" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = B56294F82D949F6D008CEE4F /* jockey */;
+			target = B56294F82D949F6D008CEE4F /* ShareBeacon */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -28,9 +28,9 @@
 		B56294FB2D949F6D008CEE4F /* ShareBeacon */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				B58EBD912D97374200DCEB07 /* Exceptions for "jockey" folder in "jockey" target */,
+				B58EBD912D97374200DCEB07 /* Exceptions for "ShareBeacon" folder in "ShareBeacon" target */,
 			);
-			path = jockey;
+			path = ShareBeacon;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -50,7 +50,7 @@
 		B56294F02D949F6D008CEE4F = {
 			isa = PBXGroup;
 			children = (
-				B56294FB2D949F6D008CEE4F /* jockey */,
+				B56294FB2D949F6D008CEE4F /* ShareBeacon */,
 				B56294FA2D949F6D008CEE4F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -58,7 +58,7 @@
 		B56294FA2D949F6D008CEE4F /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				B56294F92D949F6D008CEE4F /* jockey.app */,
+				B56294F92D949F6D008CEE4F /* ShareBeacon.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -68,7 +68,7 @@
 /* Begin PBXNativeTarget section */
 		B56294F82D949F6D008CEE4F /* ShareBeacon */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B56295082D949F6E008CEE4F /* Build configuration list for PBXNativeTarget "jockey" */;
+			buildConfigurationList = B56295082D949F6E008CEE4F /* Build configuration list for PBXNativeTarget "ShareBeacon" */;
 			buildPhases = (
 				B56294F52D949F6D008CEE4F /* Sources */,
 				B56294F62D949F6D008CEE4F /* Frameworks */,
@@ -80,7 +80,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				B56294FB2D949F6D008CEE4F /* jockey */,
+				B56294FB2D949F6D008CEE4F /* ShareBeacon */,
 			);
 			name = ShareBeacon;
 			packageProductDependencies = (
@@ -105,7 +105,7 @@
 					};
 				};
 			};
-			buildConfigurationList = B56294F42D949F6D008CEE4F /* Build configuration list for PBXProject "jockey" */;
+			buildConfigurationList = B56294F42D949F6D008CEE4F /* Build configuration list for PBXProject "ShareBeacon" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -122,7 +122,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				B56294F82D949F6D008CEE4F /* jockey */,
+				B56294F82D949F6D008CEE4F /* ShareBeacon */,
 			);
 		};
 /* End PBXProject section */
@@ -312,18 +312,18 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = jockey/jockey.entitlements;
+				CODE_SIGN_ENTITLEMENTS = ShareBeacon/sharebeacon.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"jockey/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"ShareBeacon/Preview Content\"";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = jockey/Info.plist;
+				INFOPLIST_FILE = ShareBeacon/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = ShareBeacon;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -346,18 +346,18 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = jockey/jockey.entitlements;
+				CODE_SIGN_ENTITLEMENTS = ShareBeacon/sharebeacon.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"jockey/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"ShareBeacon/Preview Content\"";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = jockey/Info.plist;
+				INFOPLIST_FILE = ShareBeacon/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = ShareBeacon;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";

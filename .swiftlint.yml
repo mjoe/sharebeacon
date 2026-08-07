@@ -1,5 +1,5 @@
 included:
-  - jockey
+  - ShareBeacon
 only_rules:
   - array_init
   - block_based_kvo

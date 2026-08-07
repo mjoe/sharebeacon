@@ -11,7 +11,7 @@ rm -rf "${DERIVED_DATA}" "${ZIP_PATH}"
 mkdir -p "${BUILD_DIR}"
 
 xcodebuild \
-  -project "${ROOT_DIR}/jockey.xcodeproj" \
+  -project "${ROOT_DIR}/ShareBeacon.xcodeproj" \
   -scheme ShareBeacon \
   -configuration Release \
   -derivedDataPath "${DERIVED_DATA}" \

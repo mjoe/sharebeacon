@@ -24,5 +24,5 @@ and restoring Finder sidebar favorites after reconnects.
 
 - `swift test`
 - `swiftlint --strict` when SwiftLint is installed
-- `xcodebuild -project jockey.xcodeproj -scheme ShareBeacon -configuration Debug build`
+- `xcodebuild -project ShareBeacon.xcodeproj -scheme ShareBeacon -configuration Debug build`
 - `git diff --check`
