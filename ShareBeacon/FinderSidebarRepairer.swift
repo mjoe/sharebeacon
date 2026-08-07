@@ -44,7 +44,7 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
             logError("Finder \(label) list has no valid insertion point.")
             return false
         }
-        let insertionPoint = snapshotArray.firstObject as! LSSharedFileListItem
+        let insertionPoint = snapshotArray.lastObject as! LSSharedFileListItem
 
         for item in snapshot as NSArray {
             let item = item as! LSSharedFileListItem
