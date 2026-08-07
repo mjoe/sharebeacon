@@ -55,6 +55,11 @@ ShareBeacon therefore treats favorite repair as best-effort: it preserves the
 user's configured mount path, attempts a non-destructive repair after mounting,
 and never makes mounting depend on sidebar manipulation.
 
+To create a favorite initially, configure and save the share, mount it, then
+choose **Add to Finder Favorites** from that share's menu. ShareBeacon also
+attempts this automatically after every successful reconnect. If Finder does
+not refresh immediately, relaunch Finder once.
+
 ## Credits
 
 ShareBeacon is an independent project derived from
