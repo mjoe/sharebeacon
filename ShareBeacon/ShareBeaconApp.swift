@@ -7,11 +7,6 @@ struct ShareBeaconApp: App {
 
     var body: some Scene {
         MenuBarExtra("ShareBeacon", systemImage: menuBarSymbol) {
-            Text("ShareBeacon")
-                .font(.headline)
-
-            Divider()
-
             if shareManager.shares.isEmpty {
                 Text("No shares configured")
                     .foregroundStyle(.secondary)
@@ -73,9 +68,9 @@ struct ShareBeaconApp: App {
 
             Divider()
 
-            Text(AppMetadata.versionLabel)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Button("About ShareBeacon") {
+                NSApplication.shared.orderFrontStandardAboutPanel(nil)
+            }
 
             Button("Quit ShareBeacon") {
                 NSApplication.shared.terminate(nil)
