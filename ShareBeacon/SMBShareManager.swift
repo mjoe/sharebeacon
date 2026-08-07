@@ -272,6 +272,13 @@ final class SMBShareManager: NSObject {
         NSWorkspace.shared.open(AppLogger.shared.logURL)
     }
 
+    func restoreFinderFavorite(_ share: ShareConfiguration) {
+        guard state(for: share) == .mounted else { return }
+        if finderSidebarRepairer.restoreFavorite(for: share) {
+            appendLog("Restored Finder favorite for \(share.name).")
+        }
+    }
+
     func refreshMountStates() {
         let table = MountTable.current()
         for share in shares {

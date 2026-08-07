@@ -30,10 +30,15 @@ struct ShareBeaconApp: App {
                         }
                         .disabled(shareManager.state(for: share) != .mounted)
 
-                        Button("Open in Finder") {
-                            shareManager.openInFinder(share)
-                        }
-                        .disabled(shareManager.state(for: share) != .mounted)
+                         Button("Open in Finder") {
+                             shareManager.openInFinder(share)
+                         }
+                         .disabled(shareManager.state(for: share) != .mounted)
+
+                         Button("Add to Finder Favorites") {
+                             shareManager.restoreFinderFavorite(share)
+                         }
+                         .disabled(shareManager.state(for: share) != .mounted)
 
                         Divider()
 

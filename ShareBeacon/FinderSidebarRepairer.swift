@@ -18,12 +18,8 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
             return false
         }
 
-        guard
-            var root = CFPreferencesCopyAppValue(favoritesKey, applicationID) as? [String: Any],
-            var items = root["items"] as? [[String: Any]]
-        else {
-            return false
-        }
+        var root = (CFPreferencesCopyAppValue(favoritesKey, applicationID) as? [String: Any]) ?? [:]
+        var items = root["items"] as? [[String: Any]] ?? []
 
         guard !items.contains(where: { item in
             guard let existingBookmark = item["Bookmark"] as? Data else { return false }
