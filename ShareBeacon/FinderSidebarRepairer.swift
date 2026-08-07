@@ -36,9 +36,15 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
 
         var seed: UInt32 = 0
         guard let snapshot = LSSharedFileListCopySnapshot(list, &seed)?.takeUnretainedValue() else {
-            logError("Could not read Finder Favorite Volumes list.")
+            logError("Could not read Finder \(label) list.")
             return false
         }
+        let snapshotArray = snapshot as NSArray
+        guard snapshotArray.count > 0 else {
+            logError("Finder \(label) list has no valid insertion point.")
+            return false
+        }
+        let insertionPoint = snapshotArray.firstObject as! LSSharedFileListItem
 
         for item in snapshot as NSArray {
             let item = item as! LSSharedFileListItem
@@ -53,7 +59,7 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
 
         let inserted = LSSharedFileListInsertItemURL(
             list,
-            kLSSharedFileListItemLast.takeUnretainedValue(),
+            insertionPoint,
             name as CFString,
             nil,
             mountURL as CFURL,
