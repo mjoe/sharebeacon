@@ -13,7 +13,6 @@ let package = Package(
             path: "ShareBeacon",
             exclude: [
                 "Assets.xcassets",
-                "ContentView.swift",
                 "Info.plist",
                 "Logger.swift",
                 "LogsView.swift",
