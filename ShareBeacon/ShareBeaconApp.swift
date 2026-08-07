@@ -9,9 +9,6 @@ struct ShareBeaconApp: App {
         MenuBarExtra("ShareBeacon", systemImage: menuBarSymbol) {
             Text("ShareBeacon")
                 .font(.headline)
-            Text(AppMetadata.versionLabel)
-                .font(.caption)
-                .foregroundStyle(.secondary)
 
             Divider()
 
@@ -21,7 +18,7 @@ struct ShareBeaconApp: App {
             } else {
                 ForEach(shareManager.shares) { share in
                     Menu {
-                        Button("Mount Now", systemImage: "play.fill") {
+                        Button("Mount Now") {
                             shareManager.mount(share)
                         }
                         .disabled(
@@ -29,27 +26,24 @@ struct ShareBeaconApp: App {
                             !share.isEnabled
                         )
 
-                        Button("Unmount", systemImage: "eject") {
+                        Button("Unmount") {
                             shareManager.unmount(share)
                         }
                         .disabled(shareManager.state(for: share) != .mounted)
 
-                        Button("Open in Finder", systemImage: "folder") {
+                        Button("Open in Finder") {
                             shareManager.openInFinder(share)
                         }
                         .disabled(shareManager.state(for: share) != .mounted)
 
-                        Button("Add to Finder Favorites", systemImage: "star") {
+                        Button("Add to Finder Favorites") {
                             shareManager.restoreFinderFavorite(share)
                         }
                         .disabled(shareManager.state(for: share) != .mounted)
 
                         Divider()
 
-                        Button(
-                            share.isEnabled ? "Disable Share" : "Enable Share",
-                            systemImage: share.isEnabled ? "pause.circle" : "play.circle"
-                        ) {
+                        Button(share.isEnabled ? "Disable Share" : "Enable Share") {
                             shareManager.setEnabled(!share.isEnabled, for: share)
                         }
                     } label: {
@@ -63,23 +57,27 @@ struct ShareBeaconApp: App {
 
             Divider()
 
-            Button("Mount All", systemImage: "externaldrive.badge.checkmark") {
+            Button("Mount All") {
                 shareManager.mountAll()
             }
             .disabled(!hasSharesWaitingToMount)
 
             SettingsLink {
-                Label("Preferences…", systemImage: "gear")
+                Text("Preferences…")
             }
             .keyboardShortcut(",")
 
-            Button("View Log", systemImage: "doc.text") {
+            Button("View Log") {
                 shareManager.openLog()
             }
 
             Divider()
 
-            Button("Quit ShareBeacon", systemImage: "power") {
+            Text(AppMetadata.versionLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Button("Quit ShareBeacon") {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")

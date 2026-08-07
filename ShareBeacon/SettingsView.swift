@@ -214,22 +214,18 @@ private struct ShareSettingsRow: View {
                 .foregroundStyle(.secondary)
 
             Menu {
-                Button("Mount Now", systemImage: "play.fill", action: mount)
+                Button("Mount Now", action: mount)
                     .disabled(state == .mounted || !share.isEnabled)
-                Button("Unmount", systemImage: "eject", action: unmount)
+                Button("Unmount", action: unmount)
                     .disabled(state != .mounted)
-                Button("Open in Finder", systemImage: "folder", action: open)
+                Button("Open in Finder", action: open)
                     .disabled(state != .mounted)
-                Button("Add to Finder Favorites", systemImage: "star", action: favorite)
+                Button("Add to Finder Favorites", action: favorite)
                     .disabled(state != .mounted)
                 Divider()
-                Button("Edit…", systemImage: "pencil", action: edit)
-                Button(
-                    share.isEnabled ? "Disable" : "Enable",
-                    systemImage: share.isEnabled ? "pause.circle" : "play.circle",
-                    action: toggle
-                )
-                Button("Remove…", systemImage: "trash", role: .destructive, action: remove)
+                Button("Edit…", action: edit)
+                Button(share.isEnabled ? "Disable" : "Enable", action: toggle)
+                Button("Remove…", role: .destructive, action: remove)
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
