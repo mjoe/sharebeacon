@@ -9,7 +9,7 @@ struct LogsView: View {
                 Text("Recent Activity")
                     .font(.title2.bold())
                 Spacer()
-                Button("Open Log File") {
+                Button("Open Log File", systemImage: "doc.text") {
                     manager.openLog()
                 }
             }

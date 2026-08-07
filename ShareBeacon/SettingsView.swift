@@ -9,20 +9,15 @@ struct SettingsView: View {
 
     var body: some View {
         TabView {
-            sharesView
-                .tabItem {
-                    Label("Shares", systemImage: "externaldrive.connected.to.line.below")
-                }
-
-            LogsView()
-                .tabItem {
-                    Label("Logs", systemImage: "doc.text")
-                }
-
-            generalView
-                .tabItem {
-                    Label("General", systemImage: "gear")
-                }
+            Tab("Shares", systemImage: "externaldrive.connected.to.line.below") {
+                sharesView
+            }
+            Tab("Activity", systemImage: "doc.text") {
+                LogsView()
+            }
+            Tab("General", systemImage: "gear") {
+                generalView
+            }
         }
         .frame(minWidth: 720, minHeight: 480)
         .sheet(item: $editedShare) { share in
@@ -37,9 +32,7 @@ struct SettingsView: View {
                     host: "",
                     shareName: "",
                     username: "",
-                    mountPoint: FileManager.default.homeDirectoryForCurrentUser
-                        .appendingPathComponent("Volumes")
-                        .path,
+                    mountPoint: "~/Volumes",
                     isEnabled: true
                 )
             ) { share, password in
@@ -51,32 +44,28 @@ struct SettingsView: View {
     private var sharesView: some View {
         VStack(spacing: 0) {
             HStack {
-                VStack(alignment: .leading) {
-                    Text("Network Shares")
-                        .font(.title2.bold())
-                    Text("Mounts begin only after the configured SMB endpoint is reachable.")
-                        .foregroundStyle(.secondary)
-                }
+                Text("Shares")
+                    .font(.title2.bold())
+                Text("\(manager.shares.count) configured")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Button {
                     isAddingShare = true
                 } label: {
                     Label("Add Share", systemImage: "plus")
                 }
+                .buttonStyle(.glassProminent)
             }
             .padding()
 
             Divider()
 
             if manager.shares.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "externaldrive.badge.plus")
-                        .font(.system(size: 44))
-                        .foregroundStyle(.secondary)
-                    Text("No Shares")
-                        .font(.title2.bold())
+                ContentUnavailableView {
+                    Label("No Shares", systemImage: "externaldrive.badge.plus")
+                } description: {
                     Text("Add an SMB share to begin.")
-                        .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -97,37 +86,49 @@ struct SettingsView: View {
                     }
                 }
                 .listStyle(.inset)
+                .safeAreaInset(edge: .bottom) {
+                    Text("Mounts begin only after the configured SMB endpoint is reachable.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                }
             }
         }
     }
 
     private var generalView: some View {
         Form {
-            Section("Startup") {
+            Section {
                 LaunchAtLoginControl()
-                    Text("ShareBeacon stays in the menu bar and reacts to network and wake events.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Connectivity") {
-                    Text("ShareBeacon probes DNS and TCP port 445 on each SMB host. This works over Tailscale, WireGuard, OpenVPN, ordinary LANs, and other routed networks.")
+            } header: {
+                Text("Startup")
+            } footer: {
+                Text("ShareBeacon stays in the menu bar and reacts to network and wake events.")
             }
 
             Section("Diagnostics") {
-                Button("Open Log File") {
+                Button("Open Log File", systemImage: "doc.text") {
                     manager.openLog()
                 }
-                Text(AppLogger.shared.logURL.path)
-                    .font(.caption.monospaced())
-                    .textSelection(.enabled)
-                    .foregroundStyle(.secondary)
+                LabeledContent("Location") {
+                    Text(AppLogger.shared.logURL.path)
+                        .font(.caption.monospaced())
+                        .textSelection(.enabled)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("About") {
-                Text(AppMetadata.versionLabel)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                LabeledContent("Version") {
+                    Text(AppMetadata.versionLabel)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+                LabeledContent("License") {
+                    Text("MIT")
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
@@ -198,11 +199,6 @@ private struct ShareSettingsRow: View {
                 Text(share.normalizedMountPoint)
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
-                if state == .mounted {
-                    Button("Add to Finder Favorites", action: favorite)
-                        .font(.caption)
-                        .buttonStyle(.link)
-                }
                 if case .failed(let message) = state {
                     Text(message)
                         .font(.caption)
@@ -218,16 +214,22 @@ private struct ShareSettingsRow: View {
                 .foregroundStyle(.secondary)
 
             Menu {
-                Button("Mount Now", action: mount)
+                Button("Mount Now", systemImage: "play.fill", action: mount)
                     .disabled(state == .mounted || !share.isEnabled)
-                Button("Unmount", action: unmount)
+                Button("Unmount", systemImage: "eject", action: unmount)
                     .disabled(state != .mounted)
-                Button("Open in Finder", action: open)
+                Button("Open in Finder", systemImage: "folder", action: open)
+                    .disabled(state != .mounted)
+                Button("Add to Finder Favorites", systemImage: "star", action: favorite)
                     .disabled(state != .mounted)
                 Divider()
-                Button("Edit…", action: edit)
-                Button(share.isEnabled ? "Disable" : "Enable", action: toggle)
-                Button("Remove", role: .destructive, action: remove)
+                Button("Edit…", systemImage: "pencil", action: edit)
+                Button(
+                    share.isEnabled ? "Disable" : "Enable",
+                    systemImage: share.isEnabled ? "pause.circle" : "play.circle",
+                    action: toggle
+                )
+                Button("Remove…", systemImage: "trash", role: .destructive, action: remove)
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
@@ -238,7 +240,7 @@ private struct ShareSettingsRow: View {
 
     private var statusColor: Color {
         switch state {
-        case .mounted: return Color(red: 0.12, green: 0.48, blue: 0.92)
+        case .mounted: return .green
         case .failed: return .red
         case .waitingForNetwork, .mounting, .unmounting: return .orange
         case .disabled, .unmounted: return .secondary
@@ -253,6 +255,11 @@ private struct ShareEditorView: View {
     @State private var errorMessage: String?
     let onSave: (ShareConfiguration, String?) throws -> Void
 
+    private let defaultMountPoint =
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Volumes")
+            .path
+
     init(
         share: ShareConfiguration,
         onSave: @escaping (ShareConfiguration, String?) throws -> Void
@@ -266,13 +273,24 @@ private struct ShareEditorView: View {
             Form {
                 TextField("Display name", text: $share.name)
                 TextField("Host", text: $share.host)
-                TextField("Share", text: $share.shareName)
+                TextField("Share name", text: $share.shareName)
+                    .onChange(of: share.shareName) { _, newValue in
+                        suggestMountPointIfDefault(named: newValue)
+                    }
                 TextField("Username", text: $share.username)
                     .textContentType(.username)
                 SecureField("Password", text: $password)
                     .textContentType(.password)
-                TextField("Mount point", text: $share.mountPoint)
-                Toggle("Automatically mount", isOn: $share.isEnabled)
+                LabeledContent("Mount point") {
+                    HStack(spacing: 8) {
+                        TextField("", text: $share.mountPoint)
+                            .labelsHidden()
+                        Button("Browse…") {
+                            chooseMountPoint()
+                        }
+                    }
+                }
+                Toggle("Mount automatically when available", isOn: $share.isEnabled)
 
                 if let errorMessage {
                     Text(errorMessage)
@@ -304,7 +322,9 @@ private struct ShareEditorView: View {
                     }
                 }
                 .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
                 .disabled(
+                    share.name.trimmingCharacters(in: .whitespaces).isEmpty ||
                     share.host.trimmingCharacters(in: .whitespaces).isEmpty ||
                     share.shareName.trimmingCharacters(in: .whitespaces).isEmpty ||
                     share.mountPoint.trimmingCharacters(in: .whitespaces).isEmpty
@@ -312,6 +332,26 @@ private struct ShareEditorView: View {
             }
             .padding()
         }
-        .frame(width: 520, height: 500)
+        .frame(width: 560, height: 520)
+    }
+
+    private func suggestMountPointIfDefault(named shareName: String) {
+        let trimmed = shareName.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        guard share.mountPoint == defaultMountPoint || share.mountPoint == "~/Volumes" else {
+            return
+        }
+        share.mountPoint = "\(defaultMountPoint)/\(trimmed)"
+    }
+
+    private func chooseMountPoint() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Choose"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        share.mountPoint = url.path
     }
 }
