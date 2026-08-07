@@ -1,18 +1,21 @@
-import XCTest
+import Testing
 @testable import ShareBeaconCore
 
-final class ShareBeaconCoreTests: XCTestCase {
-    func testDefaultShareUsesGenericSMBEndpointAndHomeMountPoint() {
+@Suite("ShareBeacon core")
+struct ShareBeaconCoreTests {
+    @Test("default share uses generic SMB endpoint and home mount point")
+    func defaultShareUsesGenericSMBEndpointAndHomeMountPoint() {
         let share = ShareConfiguration.defaultShare(homeDirectory: "/Users/tester")
 
-        XCTAssertEqual(share.host, "nas.taila7f773.ts.net")
-        XCTAssertEqual(share.shareName, "data")
-        XCTAssertEqual(share.username, "ubani")
-        XCTAssertEqual(share.mountPoint, "/Users/tester/Volumes/data")
-        XCTAssertTrue(share.isEnabled)
+        #expect(share.host == "nas.taila7f773.ts.net")
+        #expect(share.shareName == "data")
+        #expect(share.username == "ubani")
+        #expect(share.mountPoint == "/Users/tester/Volumes/data")
+        #expect(share.isEnabled)
     }
 
-    func testConfigurationEncodingNeverContainsPassword() throws {
+    @Test("configuration encoding never contains a password")
+    func configurationEncodingNeverContainsPassword() throws {
         let share = ShareConfiguration(
             name: "NAS Data",
             host: "nas.example.test",
@@ -23,39 +26,42 @@ final class ShareBeaconCoreTests: XCTestCase {
         )
 
         let encoded = try JSONEncoder().encode([share])
-        let json = try XCTUnwrap(String(data: encoded, encoding: .utf8))
+        let json = try #require(String(data: encoded, encoding: .utf8))
 
-        XCTAssertFalse(json.localizedCaseInsensitiveContains("password"))
-        XCTAssertTrue(json.contains("nas.example.test"))
+        #expect(!json.localizedCaseInsensitiveContains("password"))
+        #expect(json.contains("nas.example.test"))
     }
 
-    func testMountTableMatchesDecodedMountPointAndShare() {
+    @Test("mount table matches decoded mount point and share")
+    func mountTableMatchesDecodedMountPointAndShare() {
         let output = """
         //ubani@nas.taila7f773.ts.net/data on /Users/tester/Volumes/data (smbfs, nodev, nosuid, mounted by tester)
         """
         let table = MountTable(output: output)
 
-        XCTAssertTrue(table.isMounted(
+        #expect(table.isMounted(
             host: "nas.taila7f773.ts.net",
             share: "data",
             at: "/Users/tester/Volumes/data"
         ))
     }
 
-    func testMountTableHandlesEscapedSpaces() {
+    @Test("mount table handles escaped spaces")
+    func mountTableHandlesEscapedSpaces() {
         let output = """
         //user@server/Team%20Data on /Users/tester/Volumes/Team Data (smbfs, nodev, nosuid)
         """
         let table = MountTable(output: output)
 
-        XCTAssertTrue(table.isMounted(
+        #expect(table.isMounted(
             host: "server",
             share: "Team Data",
             at: "/Users/tester/Volumes/Team Data"
         ))
     }
 
-    func testSMBURLContainsNoCredentialMaterial() throws {
+    @Test("SMB URL contains no credential material")
+    func smbURLContainsNoCredentialMaterial() throws {
         let share = ShareConfiguration(
             name: "NAS",
             host: "nas.example.test",
@@ -67,12 +73,13 @@ final class ShareBeaconCoreTests: XCTestCase {
 
         let url = try share.smbURL()
 
-        XCTAssertEqual(url.absoluteString, "smb://nas.example.test/data")
-        XCTAssertNil(url.user)
-        XCTAssertNil(url.password)
+        #expect(url.absoluteString == "smb://nas.example.test/data")
+        #expect(url.user == nil)
+        #expect(url.password == nil)
     }
 
-    func testValidationRejectsDuplicateMountPoints() {
+    @Test("validation rejects duplicate mount points")
+    func validationRejectsDuplicateMountPoints() {
         let first = ShareConfiguration(
             name: "One",
             host: "one.test",
@@ -90,10 +97,13 @@ final class ShareBeaconCoreTests: XCTestCase {
             isEnabled: true
         )
 
-        XCTAssertThrowsError(try ShareConfiguration.validate([first, second]))
+        #expect(throws: ShareBeaconError.self) {
+            try ShareConfiguration.validate([first, second])
+        }
     }
 
-    func testMountIdentityChangesWhenEndpointOrPathChanges() {
+    @Test("mount identity changes when endpoint or path changes")
+    func mountIdentityChangesWhenEndpointOrPathChanges() {
         let original = ShareConfiguration(
             name: "NAS",
             host: "NAS.example.test",
@@ -105,6 +115,6 @@ final class ShareBeaconCoreTests: XCTestCase {
         var changed = original
         changed.host = "other.example.test"
 
-        XCTAssertNotEqual(original.mountIdentity, changed.mountIdentity)
+        #expect(original.mountIdentity != changed.mountIdentity)
     }
 }
