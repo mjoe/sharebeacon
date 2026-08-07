@@ -28,7 +28,7 @@ let package = Package(
         .testTarget(
             name: "ShareBeaconCoreTests",
             dependencies: ["ShareBeaconCore"],
-            path: "Tests/MountJockeyCoreTests"
+            path: "Tests/ShareBeaconCoreTests"
         )
     ]
 )

@@ -17,7 +17,7 @@ body:
     id: version
     attributes:
       label: Version
-      description: What version of the app are you running? (You can find this in the macOS Menu Bar with the app active > Jockey > About Jockey)
+      description: What version of ShareBeacon are you running? You can find it in the app's menu-bar menu.
     validations:
       required: true
   - type: textarea
@@ -48,7 +48,7 @@ body:
     id: os
     attributes:
       label: Operating System
-      description: e.g. macOS 12.1, macOS 13, etc.
+      description: e.g. macOS 26.0 or macOS 26.6.
     validations:
       required: true
   - type: textarea
