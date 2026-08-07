@@ -58,3 +58,5 @@ by Ben Tindall.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+Third-party notices are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

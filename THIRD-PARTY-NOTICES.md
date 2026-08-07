@@ -1,11 +1,13 @@
+# Third-Party Notices
+
+## LaunchAtLogin-Modern
+
+ShareBeacon uses [LaunchAtLogin-Modern](https://github.com/sindresorhus/LaunchAtLogin-Modern).
+
+```text
 MIT License
 
-Copyright (c) 2021 Ben T (Ben Tindall)
-Copyright (c) 2026 Valentine Ubani Mayaki
-Copyright (c) 2026 Michael Joe
-
-This project is derived from `othyn/macos-jockey`, originally created by Ben
-Tindall, and includes security and reliability work by Valentine Ubani Mayaki.
+Copyright (c) Sindre Sorhus <sindresorhus@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -24,3 +26,4 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
