@@ -5,8 +5,11 @@ protocol FinderSidebarRepairing: Sendable {
 }
 
 struct FinderSidebarRepairer: FinderSidebarRepairing {
-    private var applicationID: CFString { "com.apple.sidebarlists" as CFString }
-    private var favoritesKey: CFString { "favorites" as CFString }
+    private var sharedFileListURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/com.apple.sharedfilelist")
+            .appendingPathComponent("com.apple.LSSharedFileList.FavoriteItems.sfl4")
+    }
 
     func restoreFavorite(for share: ShareConfiguration) -> Bool {
         let url = URL(fileURLWithPath: share.normalizedMountPoint, isDirectory: true)
@@ -18,39 +21,64 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
             return false
         }
 
-        var root = (CFPreferencesCopyAppValue(favoritesKey, applicationID) as? [String: Any]) ?? [:]
-        var items = root["items"] as? [[String: Any]] ?? []
+        let fileManager = FileManager.default
+        let root: NSMutableDictionary
+        if let data = try? Data(contentsOf: sharedFileListURL),
+           let decoded = try? NSKeyedUnarchiver.unarchivedObject(
+               ofClasses: [NSDictionary.self, NSArray.self, NSData.self, NSString.self, NSNumber.self],
+               from: data
+           ) as? NSDictionary,
+           let copy = decoded.mutableCopy() as? NSMutableDictionary {
+            root = copy
+        } else {
+            root = [
+                "items": NSMutableArray(),
+                "properties": NSMutableDictionary()
+            ]
+        }
 
-        guard !items.contains(where: { item in
-            guard let existingBookmark = item["Bookmark"] as? Data else { return false }
+        let items = (root["items"] as? NSArray)?.mutableCopy() as? NSMutableArray ?? NSMutableArray()
+        for case let item as NSDictionary in items {
+            guard let existingBookmark = item["Bookmark"] as? Data else { continue }
             var isStale = false
             guard let existingURL = try? URL(
                 resolvingBookmarkData: existingBookmark,
                 options: [],
                 relativeTo: nil,
                 bookmarkDataIsStale: &isStale
-            ) else {
+            ) else { continue }
+            if existingURL.standardizedFileURL.path == url.standardizedFileURL.path {
                 return false
             }
-            return existingURL.standardizedFileURL.path == url.standardizedFileURL.path
-        }) else {
-            return false
         }
 
-        items.append([
-            "Name": url.lastPathComponent,
+        items.add([
             "Bookmark": bookmark,
             "CustomItemProperties": [
-                "com.apple.LSSharedFileList.BindingURL": bookmark
-            ]
+                "com.apple.finder.dontshowonreappearance": true,
+                "com.apple.LSSharedFileList.ItemIsHidden": false
+            ],
+            "uuid": UUID().uuidString,
+            "visibility": 0
         ])
         root["items"] = items
 
-        CFPreferencesSetAppValue(
-            favoritesKey,
-            root as NSDictionary,
-            applicationID
-        )
-        return CFPreferencesAppSynchronize(applicationID)
+        guard let data = try? NSKeyedArchiver.archivedData(
+            withRootObject: root,
+            requiringSecureCoding: false
+        ) else {
+            return false
+        }
+
+        do {
+            try fileManager.createDirectory(
+                at: sharedFileListURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try data.write(to: sharedFileListURL, options: .atomic)
+            return true
+        } catch {
+            return false
+        }
     }
 }
