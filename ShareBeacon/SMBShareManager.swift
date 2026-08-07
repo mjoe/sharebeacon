@@ -57,6 +57,7 @@ final class SMBShareManager: NSObject {
     @ObservationIgnored private let credentialStore: CredentialStoring
     @ObservationIgnored private let endpointChecker: EndpointChecking
     @ObservationIgnored private let mounter: ShareMounting
+    @ObservationIgnored private let finderSidebarRepairer: FinderSidebarRepairing
     @ObservationIgnored private let defaults: UserDefaults
     private let saveKey = "shareBeaconShares"
     private let retryInterval: TimeInterval = 60
@@ -71,11 +72,13 @@ final class SMBShareManager: NSObject {
         credentialStore: CredentialStoring = KeychainCredentialStore.shared,
         endpointChecker: EndpointChecking = SMBEndpointChecker(),
         mounter: ShareMounting = NetFSShareMounter(),
+        finderSidebarRepairer: FinderSidebarRepairing = FinderSidebarRepairer(),
         defaults: UserDefaults = .standard
     ) {
         self.credentialStore = credentialStore
         self.endpointChecker = endpointChecker
         self.mounter = mounter
+        self.finderSidebarRepairer = finderSidebarRepairer
         self.defaults = defaults
         super.init()
         loadShares()
@@ -218,6 +221,9 @@ final class SMBShareManager: NSObject {
                 try await operationRunner.mount(mounter, share: share, password: password)
                 states[share.id] = .mounted
                 appendLog("Mounted \(share.name) at \(share.normalizedMountPoint).")
+                if finderSidebarRepairer.restoreFavorite(for: share) {
+                    appendLog("Restored Finder favorite for \(share.name).")
+                }
             } catch {
                 states[share.id] = .failed(error.localizedDescription)
                 appendLog("Failed mounting \(share.name): \(error.localizedDescription)", level: .error)

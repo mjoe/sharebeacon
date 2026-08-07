@@ -14,6 +14,7 @@ let package = Package(
             exclude: [
                 "Assets.xcassets",
                 "Info.plist",
+                "FinderSidebarRepairer.swift",
                 "Logger.swift",
                 "LogsView.swift",
                 "Preview Content",
