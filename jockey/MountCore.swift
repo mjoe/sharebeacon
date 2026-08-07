@@ -3,7 +3,7 @@ import Network
 import Security
 import NetFS
 
-enum MountJockeyError: LocalizedError, Equatable {
+enum ShareBeaconError: LocalizedError, Equatable {
     case invalidConfiguration(String)
     case credentialMissing
     case endpointUnavailable
@@ -72,7 +72,7 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
 
         for share in shares {
             guard identifiers.insert(share.id).inserted else {
-                throw MountJockeyError.invalidConfiguration("Share identifiers must be unique.")
+                throw ShareBeaconError.invalidConfiguration("Share identifiers must be unique.")
             }
 
             let host = share.host.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -80,20 +80,20 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
             let mountPoint = standardizedPath(share.mountPoint)
 
             guard !host.isEmpty, !shareName.isEmpty, !mountPoint.isEmpty else {
-                throw MountJockeyError.invalidConfiguration(
+                throw ShareBeaconError.invalidConfiguration(
                     "Host, share name, and mount point are required."
                 )
             }
             guard !host.contains("/") && !host.contains("@") else {
-                throw MountJockeyError.invalidConfiguration("Host contains invalid characters.")
+                throw ShareBeaconError.invalidConfiguration("Host contains invalid characters.")
             }
             guard !shareName.contains("/") else {
-                throw MountJockeyError.invalidConfiguration(
+                throw ShareBeaconError.invalidConfiguration(
                     "Nested SMB paths are not supported; enter the share name only."
                 )
             }
             guard mountPoints.insert(mountPoint).inserted else {
-                throw MountJockeyError.invalidConfiguration(
+                throw ShareBeaconError.invalidConfiguration(
                     "Each share must use a unique mount point."
                 )
             }
@@ -107,7 +107,7 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
         components.path = "/" + shareName.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard let url = components.url else {
-            throw MountJockeyError.invalidConfiguration("The SMB URL is invalid.")
+            throw ShareBeaconError.invalidConfiguration("The SMB URL is invalid.")
         }
         return url
     }
@@ -199,7 +199,7 @@ protocol CredentialStoring: Sendable {
 
 final class KeychainCredentialStore: CredentialStoring, @unchecked Sendable {
     static let shared = KeychainCredentialStore()
-    private let service = "com.valmayaki.mountjockey.smb"
+    private let service = "com.mjoe.sharebeacon.smb"
 
     private func query(for share: ShareConfiguration) -> [String: Any] {
         [
@@ -266,7 +266,7 @@ struct SMBEndpointChecker: EndpointChecking {
         }
 
         return await withCheckedContinuation { continuation in
-            let queue = DispatchQueue(label: "com.valmayaki.mountjockey.endpoint-check")
+            let queue = DispatchQueue(label: "com.mjoe.sharebeacon.endpoint-check")
             let connection = NWConnection(
                 host: NWEndpoint.Host(host),
                 port: endpointPort,
@@ -358,7 +358,7 @@ struct NetFSShareMounter: ShareMounting {
         mountPoints?.release()
 
         guard status == 0 else {
-            throw MountJockeyError.mountFailed(status)
+            throw ShareBeaconError.mountFailed(status)
         }
     }
 
@@ -372,7 +372,7 @@ struct NetFSShareMounter: ShareMounting {
         try process.run()
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
-            throw MountJockeyError.unmountFailed(process.terminationStatus)
+            throw ShareBeaconError.unmountFailed(process.terminationStatus)
         }
     }
 }

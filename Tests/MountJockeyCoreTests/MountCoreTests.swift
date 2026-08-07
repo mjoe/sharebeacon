@@ -1,5 +1,5 @@
 import XCTest
-@testable import MountJockeyCore
+@testable import ShareBeaconCore
 
 final class MountCoreTests: XCTestCase {
     func testDefaultShareUsesGenericSMBEndpointAndHomeMountPoint() {

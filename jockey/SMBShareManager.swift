@@ -47,7 +47,7 @@ final class SMBShareManager: NSObject, ObservableObject {
     private let endpointChecker: EndpointChecking
     private let mounter: ShareMounting
     private let defaults: UserDefaults
-    private let saveKey = "mountJockeyShares"
+    private let saveKey = "shareBeaconShares"
     private let retryInterval: TimeInterval = 60
     private let reachabilityTimeout: TimeInterval = 120
 
@@ -69,7 +69,7 @@ final class SMBShareManager: NSObject, ObservableObject {
         loadShares()
         refreshMountStates()
         startMonitoring()
-        appendLog("MountJockey started.")
+        appendLog("ShareBeacon started.")
     }
 
     deinit {
@@ -184,7 +184,7 @@ final class SMBShareManager: NSObject, ObservableObject {
 
             do {
                 guard let password = try credentialStore.password(for: share), !password.isEmpty else {
-                    throw MountJockeyError.credentialMissing
+                    throw ShareBeaconError.credentialMissing
                 }
                 try await Task.detached(priority: .utility) {
                     try self.mounter.mount(share, password: password)
@@ -268,7 +268,7 @@ final class SMBShareManager: NSObject, ObservableObject {
                 self?.mountAll()
             }
         }
-        monitor.start(queue: DispatchQueue(label: "com.valmayaki.mountjockey.network"))
+        monitor.start(queue: DispatchQueue(label: "com.mjoe.sharebeacon.network"))
         networkMonitor = monitor
 
         NSWorkspace.shared.notificationCenter.addObserver(

@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "MountJockeyCore",
-    platforms: [.macOS(.v13)],
+    name: "ShareBeaconCore",
+    platforms: [.macOS("26.0")],
     products: [
-        .library(name: "MountJockeyCore", targets: ["MountJockeyCore"])
+        .library(name: "ShareBeaconCore", targets: ["ShareBeaconCore"])
     ],
     targets: [
         .target(
-            name: "MountJockeyCore",
+            name: "ShareBeaconCore",
             path: "jockey",
             exclude: [
                 "Assets.xcassets",
@@ -26,8 +26,8 @@ let package = Package(
             sources: ["MountCore.swift"]
         ),
         .testTarget(
-            name: "MountJockeyCoreTests",
-            dependencies: ["MountJockeyCore"],
+            name: "ShareBeaconCoreTests",
+            dependencies: ["ShareBeaconCore"],
             path: "Tests/MountJockeyCoreTests"
         )
     ]
