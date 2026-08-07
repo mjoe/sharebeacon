@@ -331,6 +331,7 @@ final class SMBShareManager: NSObject {
         )
 
         retryTask?.cancel()
+        let retryInterval = self.retryInterval
         retryTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(retryInterval))
