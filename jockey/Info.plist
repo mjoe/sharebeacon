@@ -22,15 +22,15 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>jockey</string>
+			<string>sharebeacon</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>jockey</string>
+				<string>sharebeacon</string>
 			</array>
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>600258e</string>
+	<string>1</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 	<key>LSMinimumSystemVersion</key>
@@ -38,6 +38,6 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2025, Ben Tindall. All rights reserved.</string>
+	<string>Copyright © 2021 Ben Tindall, 2026 Michael Joe. MIT License.</string>
 </dict>
 </plist>

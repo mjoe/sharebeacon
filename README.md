@@ -1,35 +1,35 @@
 <div align="center">
     <img src="art/icon/Icon-1024.png" alt="logo" width="250" height="auto" />
-    <h1>Jockey for macOS</h1>
-    <p>A simple SMB (Samba) mount keep-alive menu bar app for macOS Sequoia (15) built with ♥️ in Swift & SwiftUI.</p>
+    <h1>ShareBeacon for macOS</h1>
+    <p>A reliable SMB mount and Finder sidebar companion for macOS Tahoe (26), built in Swift and SwiftUI.</p>
     <p></p>
 </div>
 
 <div align="center">
     <p>
-        <a href="https://github.com/othyn/macos-jockey/actions/workflows/cicd.yml">
-            <img src="https://github.com/othyn/macos-jockey/actions/workflows/cicd.yml/badge.svg" alt="build" />
+        <a href="https://github.com/mjoe/sharebeacon/actions/workflows/cicd.yml">
+            <img src="https://github.com/mjoe/sharebeacon/actions/workflows/cicd.yml/badge.svg" alt="build" />
         </a>
-        <a href="https://github.com/othyn/macos-jockey/actions/workflows/swiftlint.yml">
-            <img src="https://github.com/othyn/macos-jockey/actions/workflows/swiftlint.yml/badge.svg" alt="lint" />
+        <a href="https://github.com/mjoe/sharebeacon/actions/workflows/swiftlint.yml">
+            <img src="https://github.com/mjoe/sharebeacon/actions/workflows/swiftlint.yml/badge.svg" alt="lint" />
         </a>
-        <a href="https://github.com/othyn/macos-jockey/releases">
-            <img src="https://img.shields.io/github/downloads/othyn/macos-jockey/total" alt="lint" />
+        <a href="https://github.com/mjoe/sharebeacon/releases">
+            <img src="https://img.shields.io/github/downloads/mjoe/sharebeacon/total" alt="downloads" />
         </a>
-        <a href="https://github.com/othyn/macos-jockey/graphs/contributors">
-            <img src="https://img.shields.io/github/contributors/othyn/macos-jockey" alt="contributors" />
+        <a href="https://github.com/mjoe/sharebeacon/graphs/contributors">
+            <img src="https://img.shields.io/github/contributors/mjoe/sharebeacon" alt="contributors" />
         </a>
-        <a href="https://github.com/othyn/macos-jockey/network/members">
-            <img src="https://img.shields.io/github/forks/othyn/macos-jockey" alt="forks" />
+        <a href="https://github.com/mjoe/sharebeacon/network/members">
+            <img src="https://img.shields.io/github/forks/mjoe/sharebeacon" alt="forks" />
         </a>
-        <a href="https://github.com/othyn/macos-jockey/stargazers">
-            <img src="https://img.shields.io/github/stars/othyn/macos-jockey" alt="stars" />
+        <a href="https://github.com/mjoe/sharebeacon/stargazers">
+            <img src="https://img.shields.io/github/stars/mjoe/sharebeacon" alt="stars" />
         </a>
-        <a href="https://github.com/othyn/macos-jockey/issues/">
-            <img src="https://img.shields.io/github/issues/othyn/macos-jockey" alt="open issues" />
+        <a href="https://github.com/mjoe/sharebeacon/issues/">
+            <img src="https://img.shields.io/github/issues/mjoe/sharebeacon" alt="open issues" />
         </a>
-        <a href="https://github.com/othyn/macos-jockey/blob/master/LICENSE">
-            <img src="https://img.shields.io/github/license/othyn/macos-jockey.svg" alt="license" />
+        <a href="https://github.com/mjoe/sharebeacon/blob/main/LICENSE">
+            <img src="https://img.shields.io/github/license/mjoe/sharebeacon.svg" alt="license" />
         </a>
     </p>
 </div>
@@ -38,9 +38,9 @@
     <h4>
         <a href="#floppy_disk-download">Download Latest Version</a>
         <span> · </span>
-        <a href="https://github.com/othyn/macos-jockey/issues">Report a Bug</a>
+        <a href="https://github.com/mjoe/sharebeacon/issues">Report a Bug</a>
         <span> · </span>
-        <a href="https://github.com/othyn/macos-jockey/issues">Request a Feature</a>
+        <a href="https://github.com/mjoe/sharebeacon/issues">Request a Feature</a>
     </h4>
 </div>
 
@@ -64,7 +64,7 @@
 
 ## :star2: About the Project
 
-Jockey is a macOS menu bar utility that helps keep your SMB network shares mounted and connected, preventing the common issue of disconnections that can disrupt your workflow, or that aggravating 'Unavailable' on Plex when you've just got into bed.
+ShareBeacon is a macOS menu bar utility that keeps SMB network shares mounted and restores their Finder sidebar favorites after reconnects.
 
 Designed as an Open Source alternative to [AutoMounter](https://www.pixeleyes.co.nz/automounter/).
 
@@ -108,13 +108,13 @@ Designed as an Open Source alternative to [AutoMounter](https://www.pixeleyes.co
 
 ## :floppy_disk: Download
 
-**Download for macOS Sequoia (15) and higher:** [v1.0.6](https://github.com/othyn/macos-jockey/releases/download/v1.0.6/Jockey.zip)
+**Target platform:** macOS Tahoe (26) and newer. Releases will be published on the [releases page](https://github.com/mjoe/sharebeacon/releases).
 
 ### Using the app for the first time
 
 When first using the app, you will need to right click the app and click 'Open', then on the macOS popup window select 'Open' again to trust this version of the app going forward. This is as at the moment I don't have a paid Apple developer account in order to notarize the app.
 
-#### First time use for macOS Sequoia (15) users
+#### First time use for macOS Tahoe (26) users
 
 If you are using macOS Sequoia, there are increased barriers in place to stop you running un-notarized apps. To open the app you will need to do the following;
 
@@ -161,11 +161,17 @@ Detailed within that guide are steps on how...
 
 ## :warning: License
 
-Distributed under the MIT License. See [LICENSE](https://github.com/othyn/macos-jockey/blob/main/LICENSE) for more information.
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
 
 <!-- Acknowledgments -->
 
 ## :gem: Acknowledgements
+
+ShareBeacon is an independent project derived from [othyn/macos-jockey](https://github.com/othyn/macos-jockey).
+
+- Ben Tindall: original author of Jockey for macOS
+- Valentine Ubani Mayaki: security-focused fork and MountJockey improvements
+- Michael Joe: ShareBeacon maintainer and further development
 
 Useful resources and libraries that have been used in the making of this project.
 

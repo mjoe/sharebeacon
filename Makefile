@@ -32,8 +32,8 @@ clean:
 	# Clean Xcode build folder
 	xcodebuild clean -project jockey.xcodeproj -scheme jockey
 	# Remove app preferences and state
-	rm -rf ~/Library/Preferences/com.othyn.jockey.plist
-	rm -rf ~/Library/Saved\ Application\ State/com.othyn.jockey.savedState
+		rm -rf ~/Library/Preferences/com.mjoe.sharebeacon.plist
+		rm -rf ~/Library/Saved\ Application\ State/com.mjoe.sharebeacon.savedState
 	# Reset defaults
-	defaults delete com.othyn.jockey 2>/dev/null || true
+	defaults delete com.mjoe.sharebeacon 2>/dev/null || true
 	@echo "App has been reset to simulate a fresh installation"

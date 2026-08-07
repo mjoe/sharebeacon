@@ -1,6 +1,10 @@
 MIT License
 
-Copyright (c) 2021 Ben T
+Copyright (c) 2021 Ben Tindall
+Copyright (c) 2026 Michael Joe
+
+This project is derived from `othyn/macos-jockey`, originally created by Ben
+Tindall, and includes security and reliability work by Valentine Ubani Mayaki.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
