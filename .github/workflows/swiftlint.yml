@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   lint:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - run: brew install swiftlint
