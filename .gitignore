@@ -1,6 +1,9 @@
 ## Remove new local build directory
 derived_data
 
+## macOS
+.DS_Store
+
 ## Remove local build dependencies
 node_modules
 .bundle
