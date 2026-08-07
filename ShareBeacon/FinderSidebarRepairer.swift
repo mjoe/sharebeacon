@@ -38,7 +38,9 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
         }
 
         let items = (root["items"] as? NSArray)?.mutableCopy() as? NSMutableArray ?? NSMutableArray()
-        for case let item as NSDictionary in items {
+        var updatedExistingItem = false
+        for index in 0..<items.count {
+            guard let item = items[index] as? NSDictionary else { continue }
             guard let existingBookmark = item["Bookmark"] as? Data else { continue }
             var isStale = false
             guard let existingURL = try? URL(
@@ -48,19 +50,29 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
                 bookmarkDataIsStale: &isStale
             ) else { continue }
             if existingURL.standardizedFileURL.path == url.standardizedFileURL.path {
-                return false
+                let updatedItem = item.mutableCopy() as? NSMutableDictionary ?? NSMutableDictionary()
+                let properties = (updatedItem["CustomItemProperties"] as? NSDictionary)?.mutableCopy()
+                    as? NSMutableDictionary ?? NSMutableDictionary()
+                properties["com.apple.finder.dontshowonreappearance"] = false
+                properties["com.apple.LSSharedFileList.ItemIsHidden"] = false
+                updatedItem["CustomItemProperties"] = properties
+                items[index] = updatedItem
+                updatedExistingItem = true
+                break
             }
         }
 
-        items.add([
-            "Bookmark": bookmark,
-            "CustomItemProperties": [
-                "com.apple.finder.dontshowonreappearance": true,
-                "com.apple.LSSharedFileList.ItemIsHidden": false
-            ],
-            "uuid": UUID().uuidString,
-            "visibility": 0
-        ])
+        if !updatedExistingItem {
+            items.add([
+                "Bookmark": bookmark,
+                "CustomItemProperties": [
+                    "com.apple.finder.dontshowonreappearance": false,
+                    "com.apple.LSSharedFileList.ItemIsHidden": false
+                ],
+                "uuid": UUID().uuidString,
+                "visibility": 0
+            ])
+        }
         root["items"] = items
 
         guard let data = try? NSKeyedArchiver.archivedData(
