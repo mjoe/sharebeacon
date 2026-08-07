@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import Network
 import Security
 import NetFS
@@ -158,6 +159,10 @@ struct MountTable: Sendable {
         }
     }
 
+    private init(entries: [Entry]) {
+        self.entries = entries
+    }
+
     func isMounted(host: String, share: String, at mountPoint: String) -> Bool {
         let expectedMountPoint = URL(fileURLWithPath: mountPoint).standardizedFileURL.path
         let rawExpectedSource = "//\(host.lowercased())/\(share)"
@@ -182,20 +187,34 @@ struct MountTable: Sendable {
     }
 
     static func current() -> MountTable {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/sbin/mount")
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = output.fileHandleForReading.readDataToEndOfFile()
-            return MountTable(output: String(data: data, encoding: .utf8) ?? "")
-        } catch {
-            return MountTable(output: "")
+        var mounts: UnsafeMutablePointer<statfs>?
+        let count = getmntinfo(&mounts, MNT_NOWAIT)
+        guard let mounts, count > 0 else {
+            return MountTable(entries: [])
         }
+
+        let entries = (0..<Int(count)).compactMap { index -> Entry? in
+            var mount = mounts[index]
+            let fileSystemType = withUnsafePointer(to: &mount.f_fstypename) { pointer in
+                pointer.withMemoryRebound(to: CChar.self, capacity: MemoryLayout<statfs>.size) {
+                    String(cString: $0)
+                }
+            }
+            guard fileSystemType == "smbfs" else { return nil }
+
+            let source = withUnsafePointer(to: &mount.f_mntfromname) { pointer in
+                pointer.withMemoryRebound(to: CChar.self, capacity: MemoryLayout<statfs>.size) {
+                    String(cString: $0)
+                }
+            }
+            let mountPoint = withUnsafePointer(to: &mount.f_mntonname) { pointer in
+                pointer.withMemoryRebound(to: CChar.self, capacity: MemoryLayout<statfs>.size) {
+                    String(cString: $0)
+                }
+            }
+            return Entry(source: source, mountPoint: mountPoint)
+        }
+        return MountTable(entries: entries)
     }
 }
 
