@@ -225,7 +225,7 @@ private struct ShareSettingsRow: View {
 
     private var statusColor: Color {
         switch state {
-        case .mounted: return .green
+        case .mounted: return Color(red: 0.12, green: 0.48, blue: 0.92)
         case .failed: return .red
         case .waitingForNetwork, .mounting, .unmounting: return .orange
         case .disabled, .unmounted: return .secondary
