@@ -1,7 +1,7 @@
 import AppKit
-import Combine
 import Foundation
 import Network
+import Observation
 
 enum ShareRuntimeState: Equatable {
     case disabled
@@ -38,22 +38,23 @@ enum ShareRuntimeState: Equatable {
 }
 
 @MainActor
-final class SMBShareManager: NSObject, ObservableObject {
-    @Published private(set) var shares: [ShareConfiguration] = []
-    @Published private(set) var states: [UUID: ShareRuntimeState] = [:]
-    @Published private(set) var logs: [AppLogEntry] = []
+@Observable
+final class SMBShareManager: NSObject {
+    private(set) var shares: [ShareConfiguration] = []
+    private(set) var states: [UUID: ShareRuntimeState] = [:]
+    private(set) var logs: [AppLogEntry] = []
 
-    private let credentialStore: CredentialStoring
-    private let endpointChecker: EndpointChecking
-    private let mounter: ShareMounting
-    private let defaults: UserDefaults
+    @ObservationIgnored private let credentialStore: CredentialStoring
+    @ObservationIgnored private let endpointChecker: EndpointChecking
+    @ObservationIgnored private let mounter: ShareMounting
+    @ObservationIgnored private let defaults: UserDefaults
     private let saveKey = "shareBeaconShares"
     private let retryInterval: TimeInterval = 60
     private let reachabilityTimeout: TimeInterval = 120
 
-    private var networkMonitor: NWPathMonitor?
-    private var retryTimer: Timer?
-    private var operations: [UUID: Task<Void, Never>] = [:]
+    @ObservationIgnored private var networkMonitor: NWPathMonitor?
+    @ObservationIgnored private var retryTimer: Timer?
+    @ObservationIgnored private var operations: [UUID: Task<Void, Never>] = [:]
 
     init(
         credentialStore: CredentialStoring = KeychainCredentialStore.shared,

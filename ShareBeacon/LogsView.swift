@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LogsView: View {
-    @EnvironmentObject private var manager: SMBShareManager
+    @Environment(SMBShareManager.self) private var manager
 
     var body: some View {
         VStack(spacing: 0) {

@@ -3,7 +3,7 @@ import SwiftUI
 
 @main
 struct ShareBeaconApp: App {
-    @StateObject private var shareManager = SMBShareManager()
+    @State private var shareManager = SMBShareManager()
 
     var body: some Scene {
         MenuBarExtra("ShareBeacon", systemImage: menuBarSymbol) {
@@ -76,7 +76,7 @@ struct ShareBeaconApp: App {
 
         Settings {
             SettingsView()
-                .environmentObject(shareManager)
+                .environment(shareManager)
         }
     }
 

@@ -3,7 +3,7 @@ import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
-    @EnvironmentObject private var manager: SMBShareManager
+    @Environment(SMBShareManager.self) private var manager
     @State private var editedShare: ShareConfiguration?
     @State private var isAddingShare = false
 
