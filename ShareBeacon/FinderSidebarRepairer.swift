@@ -12,6 +12,7 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
             kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
         ] as CFDictionary
         guard AXIsProcessTrustedWithOptions(accessibilityOptions) else {
+            logWarning("Finder favorite repair needs Accessibility permission.")
             return false
         }
 
@@ -33,8 +34,14 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
         """
 
         var error: NSDictionary?
-        guard let appleScript = NSAppleScript(source: script) else { return false }
+        guard let appleScript = NSAppleScript(source: script) else {
+            logError("Could not create Finder favorite AppleScript.")
+            return false
+        }
         appleScript.executeAndReturnError(&error)
+        if let error {
+            logError("Finder favorite AppleScript failed: \(error)")
+        }
         return error == nil
     }
 
