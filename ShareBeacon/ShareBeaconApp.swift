@@ -55,9 +55,8 @@ struct ShareBeaconApp: App {
                 shareManager.mountAll()
             }
 
-            Button("Preferences…") {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                NSApp.activate(ignoringOtherApps: true)
+            SettingsLink {
+                Text("Preferences…")
             }
             .keyboardShortcut(",")
 
