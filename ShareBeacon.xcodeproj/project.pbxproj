@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		B58EBD972D973ABE00DCEB07 /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = B58EBD962D973ABE00DCEB07 /* LaunchAtLogin */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,7 +39,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B58EBD972D973ABE00DCEB07 /* LaunchAtLogin in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -84,7 +82,6 @@
 			);
 			name = ShareBeacon;
 			packageProductDependencies = (
-				B58EBD962D973ABE00DCEB07 /* LaunchAtLogin */,
 			);
 			productName = ShareBeacon;
 			productReference = B56294F92D949F6D008CEE4F /* ShareBeacon.app */;
@@ -115,7 +112,6 @@
 			mainGroup = B56294F02D949F6D008CEE4F;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				B58EBD952D973ABE00DCEB07 /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B56294FA2D949F6D008CEE4F /* Products */;
@@ -381,24 +377,6 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		B58EBD952D973ABE00DCEB07 /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sindresorhus/LaunchAtLogin-Modern";
-			requirement = {
-				kind = revision;
-				revision = a04ec1c363be3627734f6dad757d82f5d4fa8fcc;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		B58EBD962D973ABE00DCEB07 /* LaunchAtLogin */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B58EBD952D973ABE00DCEB07 /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */;
-			productName = LaunchAtLogin;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = B56294F12D949F6D008CEE4F /* Project object */;
 }

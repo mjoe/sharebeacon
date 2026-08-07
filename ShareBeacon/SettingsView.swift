@@ -1,5 +1,5 @@
 import AppKit
-import LaunchAtLogin
+import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
@@ -103,7 +103,7 @@ struct SettingsView: View {
     private var generalView: some View {
         Form {
             Section("Startup") {
-                    LaunchAtLogin.Toggle("Launch ShareBeacon at login")
+                LaunchAtLoginControl()
                     Text("ShareBeacon stays in the menu bar and reacts to network and wake events.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -125,6 +125,29 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
+    }
+}
+
+private struct LaunchAtLoginControl: View {
+    @State private var isEnabled = SMAppService.mainApp.status == .enabled
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Toggle("Launch ShareBeacon at login", isOn: $isEnabled)
+            .onChange(of: isEnabled) { _, enabled in
+                do {
+                    if enabled {
+                        try SMAppService.mainApp.register()
+                    } else {
+                        try SMAppService.mainApp.unregister()
+                    }
+                    errorMessage = nil
+                } catch {
+                    isEnabled = SMAppService.mainApp.status == .enabled
+                    errorMessage = error.localizedDescription
+                }
+            }
+            .help(errorMessage ?? "")
     }
 }
 
