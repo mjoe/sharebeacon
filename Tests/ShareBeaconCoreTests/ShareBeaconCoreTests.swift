@@ -1,7 +1,7 @@
 import XCTest
 @testable import ShareBeaconCore
 
-final class MountCoreTests: XCTestCase {
+final class ShareBeaconCoreTests: XCTestCase {
     func testDefaultShareUsesGenericSMBEndpointAndHomeMountPoint() {
         let share = ShareConfiguration.defaultShare(homeDirectory: "/Users/tester")
 
@@ -91,5 +91,20 @@ final class MountCoreTests: XCTestCase {
         )
 
         XCTAssertThrowsError(try ShareConfiguration.validate([first, second]))
+    }
+
+    func testMountIdentityChangesWhenEndpointOrPathChanges() {
+        let original = ShareConfiguration(
+            name: "NAS",
+            host: "NAS.example.test",
+            shareName: "data",
+            username: "user",
+            mountPoint: "~/Volumes/data",
+            isEnabled: true
+        )
+        var changed = original
+        changed.host = "other.example.test"
+
+        XCTAssertNotEqual(original.mountIdentity, changed.mountIdentity)
     }
 }

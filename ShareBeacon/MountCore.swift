@@ -116,6 +116,14 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
         Self.standardizedPath(mountPoint)
     }
 
+    var mountIdentity: String {
+        [
+            host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+            shareName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+            normalizedMountPoint
+        ].joined(separator: "\u{1f}")
+    }
+
     private static func standardizedPath(_ path: String) -> String {
         let expanded: String
         if path == "~" {

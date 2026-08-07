@@ -88,6 +88,7 @@ final class SMBShareManager: NSObject, ObservableObject {
     }
 
     func saveShare(_ share: ShareConfiguration, password: String?) throws {
+        let existing = shares.first { $0.id == share.id }
         var updated = shares
         if let index = updated.firstIndex(where: { $0.id == share.id }) {
             updated[index] = share
@@ -105,7 +106,21 @@ final class SMBShareManager: NSObject, ObservableObject {
         states[share.id] = share.isEnabled ? .unmounted : .disabled
         appendLog("Saved configuration for \(share.name).")
 
-        if share.isEnabled {
+        let needsReconciliation = existing.map {
+            $0.mountIdentity != share.mountIdentity ||
+            (password?.isEmpty == false) ||
+            ($0.isEnabled && !share.isEnabled)
+        } ?? false
+
+        if needsReconciliation,
+           let existing,
+           MountTable.current().isMounted(
+               host: existing.host,
+               share: existing.shareName,
+               at: existing.normalizedMountPoint
+           ) {
+            unmount(existing, thenMount: share.isEnabled ? share : nil)
+        } else if share.isEnabled {
             mount(share)
         }
     }
@@ -115,6 +130,13 @@ final class SMBShareManager: NSObject, ObservableObject {
         operations[share.id] = nil
         if removeCredential {
             try? credentialStore.deletePassword(for: share)
+        }
+        if MountTable.current().isMounted(
+            host: share.host,
+            share: share.shareName,
+            at: share.normalizedMountPoint
+        ) {
+            unmount(share)
         }
         shares.removeAll { $0.id == share.id }
         states[share.id] = nil
@@ -126,11 +148,6 @@ final class SMBShareManager: NSObject, ObservableObject {
         guard var updated = shares.first(where: { $0.id == share.id }) else { return }
         updated.isEnabled = enabled
         try? saveShare(updated, password: nil)
-        if !enabled {
-            operations[share.id]?.cancel()
-            operations[share.id] = nil
-            states[share.id] = .disabled
-        }
     }
 
     func mountAll() {
@@ -199,17 +216,32 @@ final class SMBShareManager: NSObject, ObservableObject {
     }
 
     func unmount(_ share: ShareConfiguration) {
+        unmount(share, thenMount: nil)
+    }
+
+    private func unmount(_ share: ShareConfiguration, thenMount replacement: ShareConfiguration?) {
         guard operations[share.id] == nil else { return }
         states[share.id] = .unmounting
         operations[share.id] = Task { [weak self] in
             guard let self else { return }
-            defer { operations[share.id] = nil }
+            defer {
+                operations[share.id] = nil
+                if let replacement,
+                   shares.contains(where: { $0.id == replacement.id }),
+                   replacement.isEnabled {
+                    mount(replacement)
+                }
+            }
 
             do {
                 try await Task.detached(priority: .utility) {
                     try self.mounter.unmount(share)
                 }.value
-                states[share.id] = share.isEnabled ? .unmounted : .disabled
+                if let current = shares.first(where: { $0.id == share.id }) {
+                    states[share.id] = current.isEnabled ? .unmounted : .disabled
+                } else {
+                    states[share.id] = nil
+                }
                 appendLog("Unmounted \(share.name).")
             } catch {
                 states[share.id] = .failed(error.localizedDescription)
