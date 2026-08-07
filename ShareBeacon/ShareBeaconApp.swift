@@ -9,11 +9,14 @@ struct ShareBeaconApp: App {
         MenuBarExtra("ShareBeacon", systemImage: menuBarSymbol) {
             Text("ShareBeacon")
                 .font(.headline)
+            Text(AppMetadata.versionLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             Divider()
 
             if shareManager.shares.isEmpty {
-                Text("No shares configured")
+            Text("No shares configured")
             } else {
                 ForEach(shareManager.shares) { share in
                     Menu {

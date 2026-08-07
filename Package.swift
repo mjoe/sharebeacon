@@ -15,6 +15,7 @@ let package = Package(
                 "Assets.xcassets",
                 "Info.plist",
                 "FinderSidebarRepairer.swift",
+                "AppMetadata.swift",
                 "Logger.swift",
                 "LogsView.swift",
                 "Preview Content",

@@ -89,6 +89,7 @@ struct SettingsView: View {
                             mount: { manager.mount(share) },
                             unmount: { manager.unmount(share) },
                             open: { manager.openInFinder(share) },
+                            favorite: { manager.restoreFinderFavorite(share) },
                             edit: { editedShare = share },
                             toggle: { manager.setEnabled(!share.isEnabled, for: share) },
                             remove: { manager.removeShare(share) }
@@ -120,6 +121,12 @@ struct SettingsView: View {
                 Text(AppLogger.shared.logURL.path)
                     .font(.caption.monospaced())
                     .textSelection(.enabled)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("About") {
+                Text(AppMetadata.versionLabel)
+                    .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
             }
         }
@@ -158,6 +165,7 @@ private struct ShareSettingsRow: View {
     let mount: () -> Void
     let unmount: () -> Void
     let open: () -> Void
+    let favorite: () -> Void
     let edit: () -> Void
     let toggle: () -> Void
     let remove: () -> Void
@@ -190,6 +198,11 @@ private struct ShareSettingsRow: View {
                 Text(share.normalizedMountPoint)
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
+                if state == .mounted {
+                    Button("Add to Finder Favorites", action: favorite)
+                        .font(.caption)
+                        .buttonStyle(.link)
+                }
                 if case .failed(let message) = state {
                     Text(message)
                         .font(.caption)
