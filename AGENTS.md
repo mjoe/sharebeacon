@@ -12,6 +12,8 @@ and restoring Finder sidebar favorites after reconnects.
 - Run `swift test` after core changes and `git diff --check` before every commit.
 - Use commit-often: commit one coherent change as soon as it is verified.
 - Finder sidebar repair is best-effort and must never block mounting.
+- Keep the product version in `VERSION` using two numeric components.
+- Use `GITHUB_RUN_NUMBER` as the CI build number; local builds use the commit count unless `BUILD_NUMBER` is provided.
 
 ## Priorities
 

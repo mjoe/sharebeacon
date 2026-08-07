@@ -21,6 +21,12 @@ sidebar favorites after a share reconnects.
 - Xcode or Xcode Command Line Tools
 - Access to an SMB server
 
+## Versioning
+
+ShareBeacon currently uses a two-part product version, starting at `0.1`.
+Release tags use the same format, for example `v0.1`. Build numbers are
+separate and increase for each CI build.
+
 ## Build and Test
 
 ```bash
