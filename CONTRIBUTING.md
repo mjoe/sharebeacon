@@ -2,6 +2,12 @@
 
 ShareBeacon accepts focused pull requests against `main`.
 
+## Development Transparency
+
+ShareBeacon may be developed with AI-assisted tools. All generated or
+AI-assisted changes are reviewed, tested, and ultimately maintained by Joerg
+Mattiello. AI tools are not copyright holders or project authors.
+
 Before opening a pull request:
 
 ```bash
@@ -16,7 +22,7 @@ Security requirements:
 - Keep credentials in macOS Keychain and pass them to NetFS only in memory.
 - Do not add telemetry or external network calls without explicit documentation.
 - Pin GitHub Actions and source dependencies to immutable revisions.
-- Preserve macOS Ventura compatibility unless a breaking change is approved.
+- Support macOS 26 and newer only.
 
 Use short conventional commit subjects such as:
 
