@@ -39,27 +39,40 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
             logError("Could not read Finder \(label) list.")
             return false
         }
-        let snapshotArray = snapshot as NSArray
-        guard snapshotArray.count > 0 else {
+        let items = snapshot as NSArray
+        guard items.count > 0 else {
             logError("Finder \(label) list has no valid insertion point.")
             return false
         }
-        let insertionPoint = snapshotArray.lastObject as! LSSharedFileListItem
+        let lastItem = items.lastObject as! LSSharedFileListItem
 
-        for item in snapshot as NSArray {
+        var existing: LSSharedFileListItem?
+        for item in items {
             let item = item as! LSSharedFileListItem
             var error: Unmanaged<CFError>?
             guard let resolved = LSSharedFileListItemCopyResolvedURL(item, 0, &error)?.takeUnretainedValue() else {
                 continue
             }
             if (resolved as URL).standardizedFileURL.path == mountURL.standardizedFileURL.path {
-                return false
+                existing = item
+                break
             }
+        }
+
+        if let existing {
+            guard existing !== lastItem else {
+                return true
+            }
+            let status = LSSharedFileListItemMove(list, existing, lastItem)
+            if status != noErr {
+                logError("Finder rejected moving the \(label) item to the end (OSStatus \(status)).")
+            }
+            return status == noErr
         }
 
         let inserted = LSSharedFileListInsertItemURL(
             list,
-            insertionPoint,
+            lastItem,
             name as CFString,
             nil,
             mountURL as CFURL,
