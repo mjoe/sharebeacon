@@ -32,6 +32,7 @@ struct LogsView: View {
                     Text(entry.message)
                 }
             }
+            .scrollContentBackground(.hidden)
         }
     }
 }

@@ -20,6 +20,8 @@ struct SettingsView: View {
             }
         }
         .frame(minWidth: 720, minHeight: 480)
+        .background(.ultraThinMaterial)
+        .background(TransparentWindowBackground())
         .sheet(item: $editedShare) { share in
             ShareEditorView(share: share) { updated, password in
                 try manager.saveShare(updated, password: password)
@@ -86,6 +88,7 @@ struct SettingsView: View {
                     }
                 }
                 .listStyle(.inset)
+                .scrollContentBackground(.hidden)
                 .safeAreaInset(edge: .bottom) {
                     Text("Mounts begin only after the configured SMB endpoint is reachable.")
                         .font(.caption)
@@ -132,8 +135,25 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
         .padding()
     }
+}
+
+private final class TransparentWindowHost: NSView {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        window?.isOpaque = false
+        window?.backgroundColor = .clear
+    }
+}
+
+private struct TransparentWindowBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        TransparentWindowHost()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
 private struct LaunchAtLoginControl: View {
