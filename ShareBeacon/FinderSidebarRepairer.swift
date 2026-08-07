@@ -51,11 +51,7 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
             ) else { continue }
             if existingURL.standardizedFileURL.path == url.standardizedFileURL.path {
                 let updatedItem = item.mutableCopy() as? NSMutableDictionary ?? NSMutableDictionary()
-                let properties = (updatedItem["CustomItemProperties"] as? NSDictionary)?.mutableCopy()
-                    as? NSMutableDictionary ?? NSMutableDictionary()
-                properties["com.apple.finder.dontshowonreappearance"] = false
-                properties["com.apple.LSSharedFileList.ItemIsHidden"] = false
-                updatedItem["CustomItemProperties"] = properties
+                updatedItem["CustomItemProperties"] = NSMutableDictionary()
                 items[index] = updatedItem
                 updatedExistingItem = true
                 break
@@ -65,10 +61,7 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
         if !updatedExistingItem {
             items.add([
                 "Bookmark": bookmark,
-                "CustomItemProperties": [
-                    "com.apple.finder.dontshowonreappearance": false,
-                    "com.apple.LSSharedFileList.ItemIsHidden": false
-                ],
+                "CustomItemProperties": NSMutableDictionary(),
                 "uuid": UUID().uuidString,
                 "visibility": 0
             ])
