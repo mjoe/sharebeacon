@@ -51,8 +51,8 @@ ShareBeacon is an independent project derived from
 [othyn/macos-jockey](https://github.com/othyn/macos-jockey), originally created
 by Ben Tindall.
 
-- [Ben Tindall (@othyn)](https://github.com/othyn): original Jockey for macOS author
-- [Valentine Ubani Mayaki (@valmayaki)](https://github.com/valmayaki): security-focused fork and mount-manager improvements
+- Ben Tindall ([@othyn](https://github.com/othyn)): original Jockey for macOS author
+- Valentine Ubani Mayaki ([@valmayaki](https://github.com/valmayaki)): security-focused fork and mount-manager improvements
 - Joerg Mattiello ([@mjoe](https://github.com/mjoe)): ShareBeacon maintainer and further development
 
 ## License
