@@ -72,6 +72,18 @@ struct ShareBeaconCoreTests {
         #expect(table.mountPoint(host: "nas.example.test", share: "missing") == nil)
     }
 
+    @Test("mount table finds a share mounted under a different host form")
+    func mountTableFindsShareMountedUnderDifferentHostForm() {
+        let output = """
+        //mjoe@192.168.8.11/docs on /Volumes/docs (smbfs, nodev, nosuid, mounted by mjoe)
+        """
+        let table = MountTable(output: output)
+
+        #expect(table.mountPoint(forShareNamed: "docs") == "/Volumes/docs")
+        #expect(table.mountPoint(forShareNamed: "missing") == nil)
+        #expect(table.mountPoint(host: "192.168.8.11", share: "docs") == "/Volumes/docs")
+    }
+
     @Test("SMB URL contains no credential material")
     func smbURLContainsNoCredentialMaterial() throws {
         let share = ShareConfiguration(

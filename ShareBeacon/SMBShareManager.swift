@@ -231,8 +231,24 @@ final class SMBShareManager: NSObject {
                     appendLog("Restored Finder favorite for \(share.name).")
                 }
             } catch {
-                states[share.id] = .failed(error.localizedDescription)
-                appendLog("Failed mounting \(share.name): \(error.localizedDescription)", level: .error)
+                if let existingPoint = MountTable.current().mountPoint(forShareNamed: share.shareName) {
+                    let configuredPoint = share.normalizedMountPoint
+                    adoptedMountPoints[share.id] = existingPoint == configuredPoint ? nil : existingPoint
+                    states[share.id] = .mounted
+                    appendLog(
+                        "\(share.name) is already mounted at \(existingPoint); using the existing mount.",
+                        level: .warning
+                    )
+                    if finderSidebarRepairer.restoreFavorite(
+                        for: share,
+                        at: existingPoint == configuredPoint ? nil : existingPoint
+                    ) {
+                        appendLog("Restored Finder favorite for \(share.name).")
+                    }
+                } else {
+                    states[share.id] = .failed(error.localizedDescription)
+                    appendLog("Failed mounting \(share.name): \(error.localizedDescription)", level: .error)
+                }
             }
         }
     }

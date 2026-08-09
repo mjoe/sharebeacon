@@ -20,6 +20,9 @@ enum ShareBeaconError: LocalizedError, Equatable {
         case .endpointUnavailable:
             return "The SMB endpoint is not reachable."
         case .mountFailed(let status):
+            if status == 17 {
+                return "A volume is already mounted at this location (NetFS status 17)."
+            }
             return "macOS could not mount the share (NetFS status \(status))."
         case .unmountFailed(let status):
             return "macOS could not unmount the share (status \(status))."
@@ -163,12 +166,32 @@ struct MountTable: Sendable {
         self.entries = entries
     }
 
-    private func normalizedSource(_ value: String) -> String {
-        var lowercased = (value.removingPercentEncoding ?? value).lowercased()
-        if let atIndex = lowercased.firstIndex(of: "@") {
-            lowercased = "//" + lowercased[lowercased.index(after: atIndex)...]
+    private func hostComponent(from source: String) -> String {
+        var value = (source.removingPercentEncoding ?? source).lowercased()
+        if value.hasPrefix("//") {
+            value.removeFirst(2)
         }
-        return lowercased
+        if let atIndex = value.firstIndex(of: "@") {
+            value = String(value[value.index(after: atIndex)...])
+        }
+        if let slashIndex = value.firstIndex(of: "/") {
+            value = String(value[..<slashIndex])
+        }
+        return value
+    }
+
+    private func shareComponent(from source: String) -> String {
+        var value = (source.removingPercentEncoding ?? source).lowercased()
+        if value.hasPrefix("//") {
+            value.removeFirst(2)
+        }
+        if let atIndex = value.firstIndex(of: "@") {
+            value = String(value[value.index(after: atIndex)...])
+        }
+        if let slashIndex = value.firstIndex(of: "/") {
+            return String(value[value.index(after: slashIndex)...])
+        }
+        return value
     }
 
     private func normalizedMountPoint(_ value: String) -> String {
@@ -177,7 +200,22 @@ struct MountTable: Sendable {
     }
 
     private func matches(_ entry: Entry, host: String, share: String) -> Bool {
-        normalizedSource(entry.source) == normalizedSource("//\(host)/\(share)")
+        let configuredShare = share.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard shareComponent(from: entry.source) == configuredShare else {
+            return false
+        }
+        let configuredHost = host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let entryHost = hostComponent(from: entry.source)
+        if entryHost == configuredHost {
+            return true
+        }
+        let entryAddresses = Self.resolvedAddresses(for: entryHost)
+        let configuredAddresses = Self.resolvedAddresses(for: configuredHost)
+        if !entryAddresses.isEmpty, !configuredAddresses.isEmpty,
+           !Set(entryAddresses).isDisjoint(with: configuredAddresses) {
+            return true
+        }
+        return false
     }
 
     func isMounted(host: String, share: String, at mountPoint: String) -> Bool {
@@ -191,6 +229,82 @@ struct MountTable: Sendable {
     func mountPoint(host: String, share: String) -> String? {
         entries.first(where: { matches($0, host: host, share: share) })
             .map { normalizedMountPoint($0.mountPoint) }
+    }
+
+    func mountPoint(forShareNamed share: String) -> String? {
+        let expected = share.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return entries.first(where: { shareComponent(from: $0.source) == expected })
+            .map { normalizedMountPoint($0.mountPoint) }
+    }
+
+    nonisolated(unsafe) private static var resolutionCache: [String: [String]] = [:]
+    private static let resolutionLock = NSLock()
+
+    private static func resolvedAddresses(for host: String) -> [String] {
+        let key = host.lowercased()
+        resolutionLock.lock()
+        if let cached = resolutionCache[key] {
+            resolutionLock.unlock()
+            return cached
+        }
+        resolutionLock.unlock()
+
+        var addresses: [String] = []
+        var hints = addrinfo()
+        hints.ai_family = AF_UNSPEC
+        hints.ai_socktype = SOCK_STREAM
+
+        var result: UnsafeMutablePointer<addrinfo>?
+        guard getaddrinfo(host, nil, &hints, &result) == 0 else {
+            resolutionLock.lock()
+            resolutionCache[key] = []
+            resolutionLock.unlock()
+            return []
+        }
+        defer { freeaddrinfo(result) }
+
+        var cursor = result
+        while let current = cursor {
+            guard let address = current.pointee.ai_addr else {
+                cursor = current.pointee.ai_next
+                continue
+            }
+            let family = address.pointee.sa_family
+            var storage = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
+
+            let presentation: UnsafePointer<CChar>?
+            if family == AF_INET {
+                let sin = address.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee }
+                var addressBytes = sin.sin_addr
+                presentation = inet_ntop(
+                    AF_INET,
+                    &addressBytes,
+                    &storage,
+                    socklen_t(storage.count)
+                )
+            } else if family == AF_INET6 {
+                let sin6 = address.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) { $0.pointee }
+                var addressBytes = sin6.sin6_addr
+                presentation = inet_ntop(
+                    AF_INET6,
+                    &addressBytes,
+                    &storage,
+                    socklen_t(storage.count)
+                )
+            } else {
+                presentation = nil
+            }
+
+            if let presentation {
+                addresses.append(String(cString: presentation))
+            }
+            cursor = current.pointee.ai_next
+        }
+
+        resolutionLock.lock()
+        resolutionCache[key] = addresses
+        resolutionLock.unlock()
+        return addresses
     }
 
     static func current() -> MountTable {
