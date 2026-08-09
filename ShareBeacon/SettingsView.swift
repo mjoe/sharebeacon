@@ -256,19 +256,9 @@ private struct ShareSettingsRow: View {
                 .labelsHidden()
                 .help(share.isEnabled ? "Disable share" : "Enable share")
 
-            Button(role: .destructive) {
-                remove()
-            } label: {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(.plain)
-            .help("Remove share")
+            primaryActionButton
 
             Menu {
-                Button("Mount Now", action: mount)
-                    .disabled(state == .mounted || !share.isEnabled)
-                Button("Unmount", action: unmount)
-                    .disabled(state != .mounted)
                 Button("Open in Finder", action: open)
                     .disabled(state != .mounted)
                 Button("Add to Finder Favorites", action: favorite)
@@ -279,12 +269,33 @@ private struct ShareSettingsRow: View {
                 Button("Edit…", action: edit)
                 Button("Remove…", role: .destructive, action: remove)
             } label: {
-                Image(systemName: "ellipsis.circle")
+                Image(systemName: "ellipsis")
             }
             .menuStyle(.borderlessButton)
+            .help("More actions")
         }
         .padding(.vertical, 6)
         .help("Double-click to edit")
+    }
+
+    @ViewBuilder
+    private var primaryActionButton: some View {
+        switch state {
+        case .mounted:
+            Button("Unmount", action: unmount)
+                .buttonStyle(.bordered)
+        case .disabled:
+            Button("Mount", action: mount)
+                .buttonStyle(.bordered)
+                .disabled(true)
+        case .waitingForNetwork, .mounting, .unmounting:
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 64)
+        case .unmounted, .failed:
+            Button("Mount", action: mount)
+                .buttonStyle(.borderedProminent)
+        }
     }
 
     private var statusColor: Color {
