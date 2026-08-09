@@ -172,6 +172,16 @@ final class SMBShareManager: NSObject {
         credentialStore.sharedCredentials(forHost: host)
     }
 
+    func updateSharedCredential(_ credential: SharedCredential, password: String) throws {
+        try credentialStore.saveSharedCredential(credential, password: password)
+        appendLog("Updated shared credential for \(credential.username)@\(credential.host).")
+    }
+
+    func deleteSharedCredential(_ credential: SharedCredential) throws {
+        try credentialStore.deleteSharedCredential(credential)
+        appendLog("Deleted shared credential for \(credential.username)@\(credential.host).")
+    }
+
     func mountAll() {
         refreshMountStates()
         for share in shares

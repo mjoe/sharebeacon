@@ -33,6 +33,12 @@ enum ShareBeaconError: LocalizedError, Equatable {
 struct SharedCredential: Codable, Equatable, Hashable, Sendable {
     var host: String
     var username: String
+
+    var account: String {
+        let host = host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let username = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        return "shared:\(host)\u{1f}\(username)"
+    }
 }
 
 struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
@@ -160,12 +166,7 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
     }
 
     var credentialAccount: String {
-        if let shared = sharedCredential {
-            let host = shared.host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            let username = shared.username.trimmingCharacters(in: .whitespacesAndNewlines)
-            return "shared:\(host)\u{1f}\(username)"
-        }
-        return id.uuidString
+        sharedCredential?.account ?? id.uuidString
     }
 
     var effectiveUsername: String {
@@ -392,6 +393,8 @@ protocol CredentialStoring: Sendable {
     func password(for share: ShareConfiguration) throws -> String?
     func deletePassword(for share: ShareConfiguration) throws
     func sharedCredentials(forHost host: String) -> [SharedCredential]
+    func saveSharedCredential(_ credential: SharedCredential, password: String) throws
+    func deleteSharedCredential(_ credential: SharedCredential) throws
 }
 
 final class KeychainCredentialStore: CredentialStoring, @unchecked Sendable {
@@ -399,16 +402,24 @@ final class KeychainCredentialStore: CredentialStoring, @unchecked Sendable {
     private let service = "com.mjoe.sharebeacon.smb"
     private static let sharedAccountPrefix = "shared:"
 
-    private func query(for share: ShareConfiguration) -> [String: Any] {
+    private func query(account: String) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: share.credentialAccount
+            kSecAttrAccount as String: account
         ]
     }
 
     func save(password: String, for share: ShareConfiguration) throws {
-        var lookup = query(for: share)
+        try save(password: password, account: share.credentialAccount)
+    }
+
+    func saveSharedCredential(_ credential: SharedCredential, password: String) throws {
+        try save(password: password, account: credential.account)
+    }
+
+    private func save(password: String, account: String) throws {
+        var lookup = query(account: account)
         let attributes: [String: Any] = [
             kSecValueData as String: Data(password.utf8),
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
@@ -442,7 +453,15 @@ final class KeychainCredentialStore: CredentialStoring, @unchecked Sendable {
     }
 
     func deletePassword(for share: ShareConfiguration) throws {
-        let status = SecItemDelete(query(for: share) as CFDictionary)
+        try delete(account: share.credentialAccount)
+    }
+
+    func deleteSharedCredential(_ credential: SharedCredential) throws {
+        try delete(account: credential.account)
+    }
+
+    private func delete(account: String) throws {
+        let status = SecItemDelete(query(account: account) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
         }

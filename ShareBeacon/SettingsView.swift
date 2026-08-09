@@ -63,7 +63,13 @@ struct SettingsView: View {
             .sheet(item: $editedShare) { share in
                 ShareEditorView(
                     share: share,
-                    availableSharedCredentials: { manager.sharedCredentials(forHost: $0) }
+                    availableSharedCredentials: { manager.sharedCredentials(forHost: $0) },
+                    updateCredential: { credential, password in
+                        try manager.updateSharedCredential(credential, password: password)
+                    },
+                    deleteCredential: { credential in
+                        try manager.deleteSharedCredential(credential)
+                    }
                 ) { updated, password in
                     try manager.saveShare(updated, password: password)
                 }
@@ -78,7 +84,13 @@ struct SettingsView: View {
                         mountPoint: "~/Volumes",
                         isEnabled: true
                     ),
-                    availableSharedCredentials: { manager.sharedCredentials(forHost: $0) }
+                    availableSharedCredentials: { manager.sharedCredentials(forHost: $0) },
+                    updateCredential: { credential, password in
+                        try manager.updateSharedCredential(credential, password: password)
+                    },
+                    deleteCredential: { credential in
+                        try manager.deleteSharedCredential(credential)
+                    }
                 ) { share, password in
                     try manager.saveShare(share, password: password)
                 }
@@ -291,7 +303,12 @@ private struct ShareEditorView: View {
     @State private var password = ""
     @State private var availableCredentials: [SharedCredential] = []
     @State private var errorMessage: String?
+    @State private var newSharedPassword = ""
+    @State private var isUpdatingSharedCredential = false
+    @State private var credentialPendingDeletion: SharedCredential?
     let availableSharedCredentials: (String) -> [SharedCredential]
+    let updateCredential: (SharedCredential, String) throws -> Void
+    let deleteCredential: (SharedCredential) throws -> Void
     let onSave: (ShareConfiguration, String?) throws -> Void
 
     private let defaultMountPoint =
@@ -302,10 +319,14 @@ private struct ShareEditorView: View {
     init(
         share: ShareConfiguration,
         availableSharedCredentials: @escaping (String) -> [SharedCredential],
+        updateCredential: @escaping (SharedCredential, String) throws -> Void,
+        deleteCredential: @escaping (SharedCredential) throws -> Void,
         onSave: @escaping (ShareConfiguration, String?) throws -> Void
     ) {
         _share = State(initialValue: share)
         self.availableSharedCredentials = availableSharedCredentials
+        self.updateCredential = updateCredential
+        self.deleteCredential = deleteCredential
         self.onSave = onSave
     }
 
@@ -368,9 +389,22 @@ private struct ShareEditorView: View {
                     SecureField("Password", text: $password)
                         .textContentType(.password)
                 } else if let shared = share.sharedCredential {
-                    Text("Uses the shared Keychain credential for \(shared.username)@\(shared.host).")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Uses the shared Keychain credential for \(shared.username)@\(shared.host).")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 12) {
+                            Button("Update Password…") {
+                                newSharedPassword = ""
+                                isUpdatingSharedCredential = true
+                            }
+                            Button("Delete…", role: .destructive) {
+                                credentialPendingDeletion = shared
+                            }
+                        }
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .controlSize(.small)
+                    }
                 }
                 LabeledContent("Mount point") {
                     HStack(spacing: 8) {
@@ -436,6 +470,49 @@ private struct ShareEditorView: View {
                     username: credential.username
                 )
             }
+        }
+        .alert("Update Shared Credential", isPresented: $isUpdatingSharedCredential) {
+            SecureField("New password", text: $newSharedPassword)
+            Button("Update") {
+                guard let shared = share.sharedCredential,
+                      !newSharedPassword.isEmpty else { return }
+                do {
+                    try updateCredential(shared, newSharedPassword)
+                    refreshCredentials()
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "Set a new password for \(share.sharedCredential.map { "\($0.username)@\($0.host)" } ?? "this credential")."
+            )
+        }
+        .alert(
+            "Delete Shared Credential?",
+            isPresented: Binding(
+                get: { credentialPendingDeletion != nil },
+                set: { if !$0 { credentialPendingDeletion = nil } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                if let shared = credentialPendingDeletion {
+                    do {
+                        try deleteCredential(shared)
+                        share.sharedCredential = nil
+                        refreshCredentials()
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+                credentialPendingDeletion = nil
+            }
+            Button("Cancel", role: .cancel) {
+                credentialPendingDeletion = nil
+            }
+        } message: {
+            Text("Entries that use this credential will require a new password. This cannot be undone.")
         }
     }
 
