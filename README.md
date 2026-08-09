@@ -8,10 +8,13 @@ sidebar favorites after a share reconnects.
 ## Features
 
 - Multiple independently configured SMB shares
+- Per-share automatic reconnect or on-demand mounting
+- Shared Keychain credentials reused across shares
 - Serialized mount operations and endpoint readiness checks
 - Automatic recovery after login, network changes, sleep/wake, and disconnects
 - Credentials kept out of URLs, configuration, process arguments, and logs
 - User-owned or `/Volumes` mount points
+- Settings window with Shares, General, and Log tabs (live log with level filter)
 - Finder sidebar favorite repair with a safe no-op fallback
 - macOS 26 or newer, Apple Silicon and Intel
 
