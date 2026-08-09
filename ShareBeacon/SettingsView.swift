@@ -109,7 +109,7 @@ struct SettingsView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(selection: $selection) {
+                List {
                     ForEach(manager.shares) { share in
                         ShareSettingsRow(
                             share: share,
@@ -123,18 +123,21 @@ struct SettingsView: View {
                             toggle: { manager.setEnabled(!share.isEnabled, for: share) },
                             remove: { sharePendingRemoval = share }
                         )
-                        .tag(share.id)
+                        .listRowBackground(
+                            selection == share.id ? Color.accentColor.opacity(0.14) : nil
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 1) {
+                            selection = share.id
+                        }
+                        .onTapGesture(count: 2) {
+                            selection = share.id
+                            editedShare = share
+                        }
                     }
                 }
                 .listStyle(.inset)
                 .scrollContentBackground(.hidden)
-                .onTapGesture(count: 2) {
-                    guard let selection,
-                          let share = manager.shares.first(where: { $0.id == selection }) else {
-                        return
-                    }
-                    editedShare = share
-                }
             }
         }
         .safeAreaInset(edge: .bottom) {
