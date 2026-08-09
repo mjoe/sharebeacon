@@ -141,7 +141,10 @@ final class SMBShareManager: NSObject {
         operations[share.id]?.cancel()
         operations[share.id] = nil
         adoptedMountPoints[share.id] = nil
-        if removeCredential {
+        if removeCredential,
+           !shares.contains(where: {
+               $0.id != share.id && $0.credentialAccount == share.credentialAccount
+           }) {
             try? credentialStore.deletePassword(for: share)
         }
         if MountTable.current().mountPoint(host: share.host, share: share.shareName) != nil {
@@ -163,6 +166,10 @@ final class SMBShareManager: NSObject {
         guard var updated = shares.first(where: { $0.id == share.id }) else { return }
         updated.autoMount = autoMount
         try? saveShare(updated, password: nil)
+    }
+
+    func sharedCredentials(forHost host: String) -> [SharedCredential] {
+        credentialStore.sharedCredentials(forHost: host)
     }
 
     func mountAll() {

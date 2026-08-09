@@ -30,6 +30,11 @@ enum ShareBeaconError: LocalizedError, Equatable {
     }
 }
 
+struct SharedCredential: Codable, Equatable, Hashable, Sendable {
+    var host: String
+    var username: String
+}
+
 struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
     var id: UUID
     var name: String
@@ -39,6 +44,7 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
     var mountPoint: String
     var isEnabled: Bool
     var autoMount: Bool
+    var sharedCredential: SharedCredential?
 
     init(
         id: UUID = UUID(),
@@ -48,7 +54,8 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
         username: String,
         mountPoint: String,
         isEnabled: Bool,
-        autoMount: Bool = true
+        autoMount: Bool = true,
+        sharedCredential: SharedCredential? = nil
     ) {
         self.id = id
         self.name = name
@@ -58,10 +65,11 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
         self.mountPoint = mountPoint
         self.isEnabled = isEnabled
         self.autoMount = autoMount
+        self.sharedCredential = sharedCredential
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, host, shareName, username, mountPoint, isEnabled, autoMount
+        case id, name, host, shareName, username, mountPoint, isEnabled, autoMount, sharedCredential
     }
 
     init(from decoder: Decoder) throws {
@@ -74,6 +82,10 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
         mountPoint = try container.decode(String.self, forKey: .mountPoint)
         isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
         autoMount = try container.decodeIfPresent(Bool.self, forKey: .autoMount) ?? true
+        sharedCredential = try container.decodeIfPresent(
+            SharedCredential.self,
+            forKey: .sharedCredential
+        )
     }
 
     static func defaultShare(homeDirectory: String = NSHomeDirectory()) -> ShareConfiguration {
@@ -145,6 +157,23 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
             shareName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
             normalizedMountPoint
         ].joined(separator: "\u{1f}")
+    }
+
+    var credentialAccount: String {
+        if let shared = sharedCredential {
+            let host = shared.host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let username = shared.username.trimmingCharacters(in: .whitespacesAndNewlines)
+            return "shared:\(host)\u{1f}\(username)"
+        }
+        return id.uuidString
+    }
+
+    var effectiveUsername: String {
+        if let shared = sharedCredential,
+           !shared.username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return shared.username.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return username
     }
 
     private static func standardizedPath(_ path: String) -> String {
@@ -362,17 +391,19 @@ protocol CredentialStoring: Sendable {
     func save(password: String, for share: ShareConfiguration) throws
     func password(for share: ShareConfiguration) throws -> String?
     func deletePassword(for share: ShareConfiguration) throws
+    func sharedCredentials(forHost host: String) -> [SharedCredential]
 }
 
 final class KeychainCredentialStore: CredentialStoring, @unchecked Sendable {
     static let shared = KeychainCredentialStore()
     private let service = "com.mjoe.sharebeacon.smb"
+    private static let sharedAccountPrefix = "shared:"
 
     private func query(for share: ShareConfiguration) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: share.id.uuidString
+            kSecAttrAccount as String: share.credentialAccount
         ]
     }
 
@@ -399,9 +430,72 @@ final class KeychainCredentialStore: CredentialStoring, @unchecked Sendable {
     }
 
     func password(for share: ShareConfiguration) throws -> String? {
-        var lookup = query(for: share)
-        lookup[kSecReturnData as String] = true
-        lookup[kSecMatchLimit as String] = kSecMatchLimitOne
+        if let stored = try read(account: share.credentialAccount) {
+            return stored
+        }
+        if share.sharedCredential != nil,
+           let legacy = try read(account: share.id.uuidString) {
+            try? save(password: legacy, for: share)
+            return legacy
+        }
+        return nil
+    }
+
+    func deletePassword(for share: ShareConfiguration) throws {
+        let status = SecItemDelete(query(for: share) as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
+        }
+    }
+
+    func sharedCredentials(forHost host: String) -> [SharedCredential] {
+        var lookup: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll
+        ]
+
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(lookup as CFDictionary, &result)
+        guard status == errSecSuccess, let items = result as? [[String: Any]] else {
+            return []
+        }
+
+        let prefix = Self.sharedAccountPrefix
+        let normalizedHost = host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        var credentials = Set<SharedCredential>()
+
+        for item in items {
+            guard let account = item[kSecAttrAccount as String] as? String,
+                  account.hasPrefix(prefix),
+                  let separator = account.firstIndex(of: "\u{1f}") else {
+                continue
+            }
+            let storedHost = account[account.index(account.startIndex, offsetBy: prefix.count)..<separator]
+            guard storedHost == normalizedHost else { continue }
+            let username = account[account.index(after: separator)...]
+            guard !username.isEmpty else { continue }
+            credentials.insert(
+                SharedCredential(
+                    host: String(storedHost),
+                    username: String(username)
+                )
+            )
+        }
+        return credentials.sorted {
+            $0.username.localizedCaseInsensitiveCompare($1.username) == .orderedAscending
+        }
+    }
+
+    private func read(account: String) throws -> String? {
+        var lookup: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
 
         var result: CFTypeRef?
         let status = SecItemCopyMatching(lookup as CFDictionary, &result)
@@ -412,13 +506,6 @@ final class KeychainCredentialStore: CredentialStoring, @unchecked Sendable {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
         }
         return String(data: data, encoding: .utf8)
-    }
-
-    func deletePassword(for share: ShareConfiguration) throws {
-        let status = SecItemDelete(query(for: share) as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
-        }
     }
 }
 
@@ -516,7 +603,7 @@ struct NetFSShareMounter: ShareMounting {
         let status = NetFSMountURLSync(
             url,
             mountURL,
-            share.username as CFString,
+            share.effectiveUsername as CFString,
             password as CFString,
             openOptions,
             mountOptions,

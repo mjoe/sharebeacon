@@ -61,7 +61,10 @@ struct SettingsView: View {
                 Text("The configuration and stored Keychain password for \"\(sharePendingRemoval?.name ?? "")\" will be removed.")
             }
             .sheet(item: $editedShare) { share in
-                ShareEditorView(share: share) { updated, password in
+                ShareEditorView(
+                    share: share,
+                    availableSharedCredentials: { manager.sharedCredentials(forHost: $0) }
+                ) { updated, password in
                     try manager.saveShare(updated, password: password)
                 }
             }
@@ -74,7 +77,8 @@ struct SettingsView: View {
                         username: "",
                         mountPoint: "~/Volumes",
                         isEnabled: true
-                    )
+                    ),
+                    availableSharedCredentials: { manager.sharedCredentials(forHost: $0) }
                 ) { share, password in
                     try manager.saveShare(share, password: password)
                 }
@@ -285,7 +289,9 @@ private struct ShareEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var share: ShareConfiguration
     @State private var password = ""
+    @State private var availableCredentials: [SharedCredential] = []
     @State private var errorMessage: String?
+    let availableSharedCredentials: (String) -> [SharedCredential]
     let onSave: (ShareConfiguration, String?) throws -> Void
 
     private let defaultMountPoint =
@@ -295,10 +301,51 @@ private struct ShareEditorView: View {
 
     init(
         share: ShareConfiguration,
+        availableSharedCredentials: @escaping (String) -> [SharedCredential],
         onSave: @escaping (ShareConfiguration, String?) throws -> Void
     ) {
         _share = State(initialValue: share)
+        self.availableSharedCredentials = availableSharedCredentials
         self.onSave = onSave
+    }
+
+    private var ownCredential: SharedCredential {
+        SharedCredential(host: share.host, username: share.username)
+    }
+
+    private var credentialOptions: [SharedCredential?] {
+        var options: [SharedCredential?] = [nil]
+        options.append(ownCredential)
+        for credential in availableCredentials where credential != ownCredential {
+            options.append(credential)
+        }
+        return options
+    }
+
+    private var showsPasswordField: Bool {
+        share.sharedCredential == nil || share.sharedCredential?.username == share.username
+    }
+
+    private var credentialBinding: Binding<SharedCredential?> {
+        Binding(
+            get: { share.sharedCredential },
+            set: { newValue in
+                if let credential = newValue, credential.username != share.username {
+                    share.username = credential.username
+                }
+                share.sharedCredential = newValue
+            }
+        )
+    }
+
+    private func credentialOptionLabel(_ credential: SharedCredential?) -> String {
+        guard let credential else {
+            return "Use a separate password for this share"
+        }
+        if credential == ownCredential {
+            return "Save as shared credential for \(credential.username)@\(credential.host)"
+        }
+        return "Use shared credential for \(credential.username)@\(credential.host)"
     }
 
     var body: some View {
@@ -312,8 +359,19 @@ private struct ShareEditorView: View {
                     }
                 TextField("Username", text: $share.username)
                     .textContentType(.username)
-                SecureField("Password", text: $password)
-                    .textContentType(.password)
+                Picker("Credentials", selection: credentialBinding) {
+                    ForEach(credentialOptions, id: \.self) { credential in
+                        Text(credentialOptionLabel(credential)).tag(credential)
+                    }
+                }
+                if showsPasswordField {
+                    SecureField("Password", text: $password)
+                        .textContentType(.password)
+                } else if let shared = share.sharedCredential {
+                    Text("Reuses the shared credential for \(shared.username)@\(shared.host).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 LabeledContent("Mount point") {
                     HStack(spacing: 8) {
                         TextField("", text: $share.mountPoint)
@@ -366,7 +424,23 @@ private struct ShareEditorView: View {
             }
             .padding()
         }
-        .frame(width: 560, height: 520)
+        .frame(width: 560, height: 560)
+        .onAppear {
+            refreshCredentials()
+        }
+        .onChange(of: share.host) { _, newHost in
+            refreshCredentials()
+            if let credential = share.sharedCredential {
+                share.sharedCredential = SharedCredential(
+                    host: newHost,
+                    username: credential.username
+                )
+            }
+        }
+    }
+
+    private func refreshCredentials() {
+        availableCredentials = availableSharedCredentials(share.host)
     }
 
     private func suggestMountPointIfDefault(named shareName: String) {
