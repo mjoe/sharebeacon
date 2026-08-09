@@ -5,6 +5,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(SMBShareManager.self) private var manager
     @Environment(\.openWindow) private var openWindow
+    @State private var selection: ShareConfiguration.ID?
     @State private var editedShare: ShareConfiguration?
     @State private var sharePendingRemoval: ShareConfiguration?
     @State private var isAddingShare = false
@@ -108,7 +109,7 @@ struct SettingsView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List {
+                List(selection: $selection) {
                     ForEach(manager.shares) { share in
                         ShareSettingsRow(
                             share: share,
@@ -122,6 +123,7 @@ struct SettingsView: View {
                             toggle: { manager.setEnabled(!share.isEnabled, for: share) },
                             remove: { sharePendingRemoval = share }
                         )
+                        .tag(share.id)
                     }
                 }
                 .listStyle(.inset)
