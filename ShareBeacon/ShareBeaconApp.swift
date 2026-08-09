@@ -79,6 +79,11 @@ struct ShareBeaconApp: App {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")
+
+            Divider()
+
+            Text(AppMetadata.versionLabel)
+                .foregroundStyle(.secondary)
         }
         .menuBarExtraStyle(.menu)
 

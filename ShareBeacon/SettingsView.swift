@@ -151,12 +151,19 @@ struct SettingsView: View {
 
     private var generalTab: some View {
         Form {
-            Toggle(isOn: launchAtLoginBinding) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Launch at Login")
-                    Text("Start ShareBeacon automatically when you sign in.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            Section {
+                Toggle(isOn: launchAtLoginBinding) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Launch at Login")
+                        Text("Start ShareBeacon automatically when you sign in.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Section {
+                LabeledContent("Version") {
+                    Text(AppMetadata.versionLabel)
                 }
             }
         }
