@@ -315,15 +315,18 @@ private struct ShareEditorView: View {
 
     private var credentialOptions: [SharedCredential?] {
         var options: [SharedCredential?] = [nil]
-        options.append(ownCredential)
-        for credential in availableCredentials where credential != ownCredential {
-            options.append(credential)
+        if availableCredentials.contains(ownCredential) {
+            options.append(contentsOf: availableCredentials)
+        } else {
+            options.append(ownCredential)
+            options.append(contentsOf: availableCredentials)
         }
         return options
     }
 
     private var showsPasswordField: Bool {
-        share.sharedCredential == nil || share.sharedCredential?.username == share.username
+        guard let credential = share.sharedCredential else { return true }
+        return !availableCredentials.contains(credential)
     }
 
     private var credentialBinding: Binding<SharedCredential?> {
@@ -342,10 +345,10 @@ private struct ShareEditorView: View {
         guard let credential else {
             return "Store a password for this share only"
         }
-        if credential == ownCredential {
-            return "Share one password across entries for \(credential.username)@\(credential.host)"
+        if availableCredentials.contains(credential) {
+            return "Reuse the shared credential for \(credential.username)@\(credential.host)"
         }
-        return "Reuse the shared credential for \(credential.username)@\(credential.host)"
+        return "Share one password across entries for \(credential.username)@\(credential.host)"
     }
 
     var body: some View {
