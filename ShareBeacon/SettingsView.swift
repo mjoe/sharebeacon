@@ -2,9 +2,14 @@ import AppKit
 import ServiceManagement
 import SwiftUI
 
+enum SettingsTab: String {
+    case shares
+    case log
+}
+
 struct SettingsView: View {
     @Environment(SMBShareManager.self) private var manager
-    @Environment(\.openWindow) private var openWindow
+    @AppStorage("selectedSettingsTab") private var selectedTab = SettingsTab.shares.rawValue
     @State private var selection: ShareConfiguration.ID?
     @State private var editedShare: ShareConfiguration?
     @State private var sharePendingRemoval: ShareConfiguration?
@@ -12,107 +17,21 @@ struct SettingsView: View {
     @State private var launchesAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
-        sharesView
-            .frame(minWidth: 620, minHeight: 420)
-            .background(.ultraThinMaterial)
-            .background(TransparentWindowBackground())
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        isAddingShare = true
-                    } label: {
-                        Label("Add Share", systemImage: "plus")
-                    }
-                    .help("Add an SMB share")
-                }
-                ToolbarItem(placement: .secondaryAction) {
-                    Menu {
-                        Toggle("Launch at Login", isOn: launchAtLoginBinding)
-                        Divider()
-                        Button("View Log", systemImage: "doc.text") {
-                            openWindow(id: "activity")
-                        }
-                    } label: {
-                        Label("More", systemImage: "ellipsis.circle")
-                    }
-                    .help("Settings and diagnostics")
-                }
-            }
-            .alert(
-                "Remove Share?",
-                isPresented: Binding(
-                    get: { sharePendingRemoval != nil },
-                    set: { if !$0 { sharePendingRemoval = nil } }
-                )
-            ) {
-                Button("Remove", role: .destructive) {
-                    if let share = sharePendingRemoval {
-                        manager.removeShare(share)
-                    }
-                    sharePendingRemoval = nil
-                }
-                Button("Cancel", role: .cancel) {
-                    sharePendingRemoval = nil
-                }
-            } message: {
-                Text("The configuration and stored Keychain password for \"\(sharePendingRemoval?.name ?? "")\" will be removed.")
-            }
-            .sheet(item: $editedShare) { share in
-                ShareEditorView(
-                    share: share,
-                    availableSharedCredentials: { manager.sharedCredentials(forHost: $0) },
-                    updateCredential: { credential, password in
-                        try manager.updateSharedCredential(credential, password: password)
-                    },
-                    deleteCredential: { credential in
-                        try manager.deleteSharedCredential(credential)
-                    }
-                ) { updated, password in
-                    try manager.saveShare(updated, password: password)
-                }
-            }
-            .sheet(isPresented: $isAddingShare) {
-                ShareEditorView(
-                    share: ShareConfiguration(
-                        name: "",
-                        host: "",
-                        shareName: "",
-                        username: "",
-                        mountPoint: "~/Volumes",
-                        isEnabled: true
-                    ),
-                    availableSharedCredentials: { manager.sharedCredentials(forHost: $0) },
-                    updateCredential: { credential, password in
-                        try manager.updateSharedCredential(credential, password: password)
-                    },
-                    deleteCredential: { credential in
-                        try manager.deleteSharedCredential(credential)
-                    }
-                ) { share, password in
-                    try manager.saveShare(share, password: password)
-                }
-            }
+        TabView(selection: $selectedTab) {
+            sharesTab
+                .tabItem { Label("Shares", systemImage: "externaldrive") }
+                .tag(SettingsTab.shares.rawValue)
+
+            LogsView()
+                .environment(AppLogger.shared)
+                .tabItem { Label("Log", systemImage: "doc.text") }
+                .tag(SettingsTab.log.rawValue)
+        }
+        .tabViewStyle(.sidebarAdaptable)
+        .frame(minWidth: 640, minHeight: 440)
     }
 
-    private var launchAtLoginBinding: Binding<Bool> {
-        Binding(
-            get: { launchesAtLogin },
-            set: { enabled in
-                launchesAtLogin = enabled
-                do {
-                    if enabled {
-                        try SMAppService.mainApp.register()
-                    } else {
-                        try SMAppService.mainApp.unregister()
-                    }
-                } catch {
-                    launchesAtLogin = SMAppService.mainApp.status == .enabled
-                }
-            }
-        )
-    }
-
-    private var sharesView: some View {
+    private var sharesTab: some View {
         Group {
             if manager.shares.isEmpty {
                 ContentUnavailableView {
@@ -155,29 +74,110 @@ struct SettingsView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            Text("Mounts begin only after the configured SMB endpoint is reachable.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
+            VStack(alignment: .leading, spacing: 10) {
+                LabeledContent {
+                    Toggle("Launch at Login", isOn: launchAtLoginBinding)
+                        .toggleStyle(.switch)
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Launch at Login")
+                        Text("Start ShareBeacon automatically when you sign in.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 4)
+                Text("Mounts begin only after the configured SMB endpoint is reachable.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    isAddingShare = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .help("Add an SMB share")
+            }
+        }
+        .alert(
+            "Remove Share?",
+            isPresented: Binding(
+                get: { sharePendingRemoval != nil },
+                set: { if !$0 { sharePendingRemoval = nil } }
+            )
+        ) {
+            Button("Remove", role: .destructive) {
+                if let share = sharePendingRemoval {
+                    manager.removeShare(share)
+                }
+                sharePendingRemoval = nil
+            }
+            Button("Cancel", role: .cancel) {
+                sharePendingRemoval = nil
+            }
+        } message: {
+            Text("The configuration and stored Keychain password for \"\(sharePendingRemoval?.name ?? "")\" will be removed.")
+        }
+        .sheet(item: $editedShare) { share in
+            ShareEditorView(
+                share: share,
+                availableSharedCredentials: { manager.sharedCredentials(forHost: $0) },
+                updateCredential: { credential, password in
+                    try manager.updateSharedCredential(credential, password: password)
+                },
+                deleteCredential: { credential in
+                    try manager.deleteSharedCredential(credential)
+                }
+            ) { updated, password in
+                try manager.saveShare(updated, password: password)
+            }
+        }
+        .sheet(isPresented: $isAddingShare) {
+            ShareEditorView(
+                share: ShareConfiguration(
+                    name: "",
+                    host: "",
+                    shareName: "",
+                    username: "",
+                    mountPoint: "~/Volumes",
+                    isEnabled: true
+                ),
+                availableSharedCredentials: { manager.sharedCredentials(forHost: $0) },
+                updateCredential: { credential, password in
+                    try manager.updateSharedCredential(credential, password: password)
+                },
+                deleteCredential: { credential in
+                    try manager.deleteSharedCredential(credential)
+                }
+            ) { share, password in
+                try manager.saveShare(share, password: password)
+            }
         }
     }
-}
 
-private final class TransparentWindowHost: NSView {
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        window?.isOpaque = false
-        window?.backgroundColor = .clear
+    private var launchAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: { launchesAtLogin },
+            set: { enabled in
+                launchesAtLogin = enabled
+                do {
+                    if enabled {
+                        try SMAppService.mainApp.register()
+                    } else {
+                        try SMAppService.mainApp.unregister()
+                    }
+                } catch {
+                    launchesAtLogin = SMAppService.mainApp.status == .enabled
+                }
+            }
+        )
     }
-}
-
-private struct TransparentWindowBackground: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        TransparentWindowHost()
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
 private struct ShareSettingsRow: View {

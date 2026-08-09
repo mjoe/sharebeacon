@@ -4,7 +4,8 @@ import SwiftUI
 @main
 struct ShareBeaconApp: App {
     @State private var shareManager = SMBShareManager()
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+    @AppStorage("selectedSettingsTab") private var selectedSettingsTab = SettingsTab.shares.rawValue
 
     var body: some Scene {
         MenuBarExtra("ShareBeacon", systemImage: menuBarSymbol) {
@@ -64,7 +65,8 @@ struct ShareBeaconApp: App {
             .keyboardShortcut(",")
 
             Button("View Log") {
-                openWindow(id: "activity")
+                selectedSettingsTab = SettingsTab.log.rawValue
+                openSettings()
             }
 
             Divider()
@@ -83,11 +85,6 @@ struct ShareBeaconApp: App {
         Settings {
             SettingsView()
                 .environment(shareManager)
-        }
-
-        Window("ShareBeacon Log", id: "activity") {
-            LogsView()
-                .environment(AppLogger.shared)
         }
     }
 
