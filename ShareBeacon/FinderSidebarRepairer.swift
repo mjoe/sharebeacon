@@ -42,7 +42,7 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
             return false
         }
         let items = snapshot as NSArray
-        guard items.count > 0 else {
+        guard !items.isEmpty else {
             logError("Finder \(label) list has no valid insertion point.")
             return false
         }
