@@ -77,25 +77,21 @@ struct SettingsView: View {
                             editedShare = share
                         })
                     }
-                    Button {
-                        isAddingShare = true
-                    } label: {
-                        Label("Add Share", systemImage: "plus")
+                    Section {
+                        Button {
+                            isAddingShare = true
+                        } label: {
+                            Label("Add Share", systemImage: "plus")
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.tint)
+                    } footer: {
+                        Text("Mounts begin only after the configured SMB endpoint is reachable.")
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.tint)
                 }
                 .listStyle(.inset)
                 .scrollContentBackground(.hidden)
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            Text("Mounts begin only after the configured SMB endpoint is reachable.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
         }
         .alert(
             "Remove Share?",
