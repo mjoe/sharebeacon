@@ -35,16 +35,17 @@ struct LogsView: View {
                 TableColumn("Time") { entry in
                     Text(entry.timestamp.formatted(date: .omitted, time: .standard))
                 }
-                .width(min: 90, ideal: 110)
+                .width(min: 80, ideal: 95)
 
                 TableColumn("Level") { entry in
                     Text(entry.level.rawValue)
                 }
-                .width(min: 70, ideal: 80)
+                .width(min: 60, ideal: 75)
 
                 TableColumn("Message") { entry in
                     Text(entry.message)
                 }
+                .width(min: 220, ideal: 460)
             }
             .scrollContentBackground(.hidden)
         }
