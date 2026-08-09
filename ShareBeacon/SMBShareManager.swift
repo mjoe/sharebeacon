@@ -66,6 +66,7 @@ final class SMBShareManager: NSObject {
     @ObservationIgnored private var retryTask: Task<Void, Never>?
     @ObservationIgnored private var operations: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var adoptedMountPoints: [UUID: String] = [:]
+    @ObservationIgnored private var manuallyUnmounted: Set<UUID> = []
     @ObservationIgnored private let operationRunner = MountOperationRunner()
 
     init(
@@ -185,12 +186,16 @@ final class SMBShareManager: NSObject {
     func mountAll() {
         refreshMountStates()
         for share in shares
-        where share.isEnabled && share.autoMount && state(for: share) != .mounted {
+        where share.isEnabled
+            && share.autoMount
+            && !manuallyUnmounted.contains(share.id)
+            && state(for: share) != .mounted {
             mount(share)
         }
     }
 
     func mount(_ share: ShareConfiguration, explicit: Bool = false) {
+        manuallyUnmounted.remove(share.id)
         guard share.isEnabled, operations[share.id] == nil else { return }
 
         let table = MountTable.current()
@@ -299,6 +304,7 @@ final class SMBShareManager: NSObject {
     }
 
     func unmount(_ share: ShareConfiguration) {
+        manuallyUnmounted.insert(share.id)
         unmount(share, thenMount: nil)
     }
 

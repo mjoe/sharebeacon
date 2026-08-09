@@ -636,16 +636,27 @@ struct NetFSShareMounter: ShareMounting {
     }
 
     func unmount(_ share: ShareConfiguration, at mountPoint: String) throws {
+        if runUnmount(arguments: ["unmount", mountPoint]) == 0 {
+            return
+        }
+        if runUnmount(arguments: ["unmount", "force", mountPoint]) == 0 {
+            return
+        }
+        throw ShareBeaconError.unmountFailed(1)
+    }
+
+    private func runUnmount(arguments: [String]) -> Int32 {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
-        process.arguments = ["unmount", mountPoint]
+        process.arguments = arguments
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
-
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            throw ShareBeaconError.unmountFailed(process.terminationStatus)
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus
+        } catch {
+            return -1
         }
     }
 }
