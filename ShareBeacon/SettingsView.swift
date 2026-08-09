@@ -324,7 +324,7 @@ private struct ShareEditorView: View {
         return options
     }
 
-    private var showsPasswordField: Bool {
+    private var showsCredentialFields: Bool {
         guard let credential = share.sharedCredential else { return true }
         return !availableCredentials.contains(credential)
     }
@@ -345,10 +345,7 @@ private struct ShareEditorView: View {
         guard let credential else {
             return "Store a password for this share only"
         }
-        if availableCredentials.contains(credential) {
-            return "Reuse the shared credential for \(credential.username)@\(credential.host)"
-        }
-        return "Share one password across entries for \(credential.username)@\(credential.host)"
+        return "\(credential.username)@\(credential.host)"
     }
 
     var body: some View {
@@ -360,18 +357,18 @@ private struct ShareEditorView: View {
                     .onChange(of: share.shareName) { _, newValue in
                         suggestMountPointIfDefault(named: newValue)
                     }
-                TextField("Username", text: $share.username)
-                    .textContentType(.username)
                 Picker("Credential", selection: credentialBinding) {
                     ForEach(credentialOptions, id: \.self) { credential in
                         Text(credentialOptionLabel(credential)).tag(credential)
                     }
                 }
-                if showsPasswordField {
+                if showsCredentialFields {
+                    TextField("Username", text: $share.username)
+                        .textContentType(.username)
                     SecureField("Password", text: $password)
                         .textContentType(.password)
                 } else if let shared = share.sharedCredential {
-                    Text("Uses the Keychain credential shared by \(shared.username)@\(shared.host); no password is stored for this entry.")
+                    Text("Uses the shared Keychain credential for \(shared.username)@\(shared.host).")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
