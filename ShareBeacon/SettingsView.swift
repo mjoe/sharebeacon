@@ -340,12 +340,12 @@ private struct ShareEditorView: View {
 
     private func credentialOptionLabel(_ credential: SharedCredential?) -> String {
         guard let credential else {
-            return "Use a separate password for this share"
+            return "Store a password for this share only"
         }
         if credential == ownCredential {
-            return "Save as shared credential for \(credential.username)@\(credential.host)"
+            return "Share one password across entries for \(credential.username)@\(credential.host)"
         }
-        return "Use shared credential for \(credential.username)@\(credential.host)"
+        return "Reuse the shared credential for \(credential.username)@\(credential.host)"
     }
 
     var body: some View {
@@ -359,7 +359,7 @@ private struct ShareEditorView: View {
                     }
                 TextField("Username", text: $share.username)
                     .textContentType(.username)
-                Picker("Credentials", selection: credentialBinding) {
+                Picker("Credential", selection: credentialBinding) {
                     ForEach(credentialOptions, id: \.self) { credential in
                         Text(credentialOptionLabel(credential)).tag(credential)
                     }
@@ -368,7 +368,7 @@ private struct ShareEditorView: View {
                     SecureField("Password", text: $password)
                         .textContentType(.password)
                 } else if let shared = share.sharedCredential {
-                    Text("Reuses the shared credential for \(shared.username)@\(shared.host).")
+                    Text("Uses the Keychain credential shared by \(shared.username)@\(shared.host); no password is stored for this entry.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
