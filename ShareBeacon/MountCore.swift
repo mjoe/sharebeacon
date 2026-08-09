@@ -38,6 +38,7 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
     var username: String
     var mountPoint: String
     var isEnabled: Bool
+    var autoMount: Bool
 
     init(
         id: UUID = UUID(),
@@ -46,7 +47,8 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
         shareName: String,
         username: String,
         mountPoint: String,
-        isEnabled: Bool
+        isEnabled: Bool,
+        autoMount: Bool = true
     ) {
         self.id = id
         self.name = name
@@ -55,6 +57,23 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
         self.username = username
         self.mountPoint = mountPoint
         self.isEnabled = isEnabled
+        self.autoMount = autoMount
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, host, shareName, username, mountPoint, isEnabled, autoMount
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        host = try container.decode(String.self, forKey: .host)
+        shareName = try container.decode(String.self, forKey: .shareName)
+        username = try container.decode(String.self, forKey: .username)
+        mountPoint = try container.decode(String.self, forKey: .mountPoint)
+        isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
+        autoMount = try container.decodeIfPresent(Bool.self, forKey: .autoMount) ?? true
     }
 
     static func defaultShare(homeDirectory: String = NSHomeDirectory()) -> ShareConfiguration {

@@ -121,6 +121,7 @@ struct SettingsView: View {
                             favorite: { manager.restoreFinderFavorite(share) },
                             edit: { editedShare = share },
                             toggle: { manager.setEnabled(!share.isEnabled, for: share) },
+                            setAutoMount: { manager.setAutoMount($0, for: share) },
                             remove: { sharePendingRemoval = share }
                         )
                         .listRowBackground(
@@ -176,10 +177,15 @@ private struct ShareSettingsRow: View {
     let favorite: () -> Void
     let edit: () -> Void
     let toggle: () -> Void
+    let setAutoMount: (Bool) -> Void
     let remove: () -> Void
 
     private var enabledBinding: Binding<Bool> {
         Binding(get: { share.isEnabled }, set: { _ in toggle() })
+    }
+
+    private var autoMountBinding: Binding<Bool> {
+        Binding(get: { share.autoMount }, set: { setAutoMount($0) })
     }
 
     var body: some View {
@@ -195,6 +201,11 @@ private struct ShareSettingsRow: View {
                         .font(.headline)
                     if !share.isEnabled {
                         Text("Disabled")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if share.isEnabled && !share.autoMount {
+                        Text("On demand")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -246,6 +257,8 @@ private struct ShareSettingsRow: View {
                     .disabled(state != .mounted)
                 Button("Add to Finder Favorites", action: favorite)
                     .disabled(state != .mounted)
+                Divider()
+                Toggle("Mount automatically", isOn: autoMountBinding)
                 Divider()
                 Button("Edit…", action: edit)
                 Button("Remove…", role: .destructive, action: remove)
@@ -310,7 +323,8 @@ private struct ShareEditorView: View {
                         }
                     }
                 }
-                Toggle("Mount automatically when available", isOn: $share.isEnabled)
+                Toggle("Share is active", isOn: $share.isEnabled)
+                Toggle("Mount automatically when available", isOn: $share.autoMount)
 
                 if let errorMessage {
                     Text(errorMessage)

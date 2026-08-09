@@ -124,14 +124,15 @@ final class SMBShareManager: NSObject {
         let needsReconciliation = existing.map {
             $0.mountIdentity != share.mountIdentity ||
             (password?.isEmpty == false) ||
-            ($0.isEnabled && !share.isEnabled)
+            ($0.isEnabled && !share.isEnabled) ||
+            ($0.autoMount && !share.autoMount)
         } ?? false
 
         if needsReconciliation,
            let existing,
            MountTable.current().mountPoint(host: existing.host, share: existing.shareName) != nil {
-            unmount(existing, thenMount: share.isEnabled ? share : nil)
-        } else if share.isEnabled {
+            unmount(existing, thenMount: share.isEnabled && share.autoMount ? share : nil)
+        } else if share.isEnabled && share.autoMount {
             mount(share)
         }
     }
@@ -158,9 +159,16 @@ final class SMBShareManager: NSObject {
         try? saveShare(updated, password: nil)
     }
 
+    func setAutoMount(_ autoMount: Bool, for share: ShareConfiguration) {
+        guard var updated = shares.first(where: { $0.id == share.id }) else { return }
+        updated.autoMount = autoMount
+        try? saveShare(updated, password: nil)
+    }
+
     func mountAll() {
         refreshMountStates()
-        for share in shares where share.isEnabled && state(for: share) != .mounted {
+        for share in shares
+        where share.isEnabled && share.autoMount && state(for: share) != .mounted {
             mount(share)
         }
     }
@@ -266,7 +274,7 @@ final class SMBShareManager: NSObject {
                 operations[share.id] = nil
                 if let replacement,
                    shares.contains(where: { $0.id == replacement.id }),
-                   replacement.isEnabled {
+                   replacement.isEnabled && replacement.autoMount {
                     mount(replacement)
                 }
             }

@@ -93,7 +93,7 @@ struct ShareBeaconApp: App {
 
     private var hasSharesWaitingToMount: Bool {
         shareManager.shares.contains {
-            shareManager.state(for: $0) != .mounted && $0.isEnabled
+            shareManager.state(for: $0) != .mounted && $0.isEnabled && $0.autoMount
         }
     }
 
