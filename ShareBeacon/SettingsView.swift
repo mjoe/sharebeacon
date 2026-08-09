@@ -29,7 +29,7 @@ struct SettingsView: View {
                     Menu {
                         Toggle("Launch at Login", isOn: launchAtLoginBinding)
                         Divider()
-                        Button("View Activity", systemImage: "doc.text") {
+                        Button("View Log", systemImage: "doc.text") {
                             openWindow(id: "activity")
                         }
                     } label: {

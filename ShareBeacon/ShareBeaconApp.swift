@@ -85,7 +85,7 @@ struct ShareBeaconApp: App {
                 .environment(shareManager)
         }
 
-        Window("ShareBeacon Activity", id: "activity") {
+        Window("ShareBeacon Log", id: "activity") {
             LogsView()
                 .environment(AppLogger.shared)
         }
