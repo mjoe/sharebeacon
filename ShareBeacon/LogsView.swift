@@ -5,25 +5,8 @@ struct LogsView: View {
     @State private var minimumLevel: LogLevel = .debug
 
     var body: some View {
-        Table(filteredEntries) {
-            TableColumn("Time") { entry in
-                Text(entry.timestamp.formatted(date: .omitted, time: .standard))
-            }
-            .width(min: 90, ideal: 110)
-
-            TableColumn("Level") { entry in
-                Text(entry.level.rawValue)
-            }
-            .width(min: 70, ideal: 80)
-
-            TableColumn("Message") { entry in
-                Text(entry.message)
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .frame(minWidth: 560, minHeight: 360)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
                 Picker("Level", selection: $minimumLevel) {
                     Text("All").tag(LogLevel.debug)
                     Text("Warnings").tag(LogLevel.warning)
@@ -32,14 +15,39 @@ struct LogsView: View {
                 .pickerStyle(.segmented)
                 .frame(width: 190)
                 .help("Show entries at this level or above")
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button("Open Full Log", systemImage: "doc.text") {
+
+                Spacer()
+
+                Button {
                     NSWorkspace.shared.open(AppLogger.shared.logURL)
+                } label: {
+                    Label("Open Full Log", systemImage: "doc.text")
                 }
                 .help("Open the complete log file in a text editor")
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            Divider()
+
+            Table(filteredEntries) {
+                TableColumn("Time") { entry in
+                    Text(entry.timestamp.formatted(date: .omitted, time: .standard))
+                }
+                .width(min: 90, ideal: 110)
+
+                TableColumn("Level") { entry in
+                    Text(entry.level.rawValue)
+                }
+                .width(min: 70, ideal: 80)
+
+                TableColumn("Message") { entry in
+                    Text(entry.message)
+                }
+            }
+            .scrollContentBackground(.hidden)
         }
+        .frame(minWidth: 560, minHeight: 360)
     }
 
     private var filteredEntries: [AppLogEntry] {

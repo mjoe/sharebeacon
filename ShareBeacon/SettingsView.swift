@@ -38,6 +38,10 @@ struct SettingsView: View {
                     Label("No Shares", systemImage: "externaldrive.badge.plus")
                 } description: {
                     Text("Add an SMB share to begin.")
+                } actions: {
+                    Button("Add Share") {
+                        isAddingShare = true
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -68,6 +72,13 @@ struct SettingsView: View {
                             editedShare = share
                         })
                     }
+                    Button {
+                        isAddingShare = true
+                    } label: {
+                        Label("Add Share", systemImage: "plus")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tint)
                 }
                 .listStyle(.inset)
                 .scrollContentBackground(.hidden)
@@ -94,16 +105,6 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    isAddingShare = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .help("Add an SMB share")
-            }
         }
         .alert(
             "Remove Share?",
