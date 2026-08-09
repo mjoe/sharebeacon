@@ -23,17 +23,17 @@ struct SettingsView: View {
                 .tabItem { Label("Shares", systemImage: "externaldrive") }
                 .tag(SettingsTab.shares.rawValue)
 
-            generalTab
-                .tabItem { Label("General", systemImage: "gearshape") }
-                .tag(SettingsTab.general.rawValue)
-
             LogsView()
                 .environment(AppLogger.shared)
                 .tabItem { Label("Log", systemImage: "doc.text") }
                 .tag(SettingsTab.log.rawValue)
+
+            generalTab
+                .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(SettingsTab.general.rawValue)
         }
         .tabViewStyle(.tabBarOnly)
-        .frame(minWidth: 640, minHeight: 440)
+        .frame(minWidth: 640, minHeight: 520)
     }
 
     private var sharesTab: some View {

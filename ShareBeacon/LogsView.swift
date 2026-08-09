@@ -48,7 +48,7 @@ struct LogsView: View {
             }
             .scrollContentBackground(.hidden)
         }
-        .frame(minWidth: 560, minHeight: 360)
+        .frame(minWidth: 560, minHeight: 440)
     }
 
     private var filteredEntries: [AppLogEntry] {
