@@ -6,63 +6,76 @@ struct SettingsView: View {
     @Environment(SMBShareManager.self) private var manager
     @State private var editedShare: ShareConfiguration?
     @State private var isAddingShare = false
+    @State private var launchesAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
-        TabView {
-            Tab("Shares", systemImage: "externaldrive.connected.to.line.below") {
-                sharesView
+        sharesView
+            .frame(minWidth: 620, minHeight: 420)
+            .background(.ultraThinMaterial)
+            .background(TransparentWindowBackground())
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        isAddingShare = true
+                    } label: {
+                        Label("Add Share", systemImage: "plus")
+                    }
+                    .help("Add an SMB share")
+                }
+                ToolbarItem(placement: .secondaryAction) {
+                    Menu {
+                        Toggle("Launch at Login", isOn: launchAtLoginBinding)
+                        Divider()
+                        Button("Open Log File", systemImage: "doc.text") {
+                            manager.openLog()
+                        }
+                    } label: {
+                        Label("More", systemImage: "ellipsis.circle")
+                    }
+                    .help("Settings and diagnostics")
+                }
             }
-            Tab("Activity", systemImage: "doc.text") {
-                LogsView()
+            .sheet(item: $editedShare) { share in
+                ShareEditorView(share: share) { updated, password in
+                    try manager.saveShare(updated, password: password)
+                }
             }
-            Tab("General", systemImage: "gear") {
-                generalView
+            .sheet(isPresented: $isAddingShare) {
+                ShareEditorView(
+                    share: ShareConfiguration(
+                        name: "",
+                        host: "",
+                        shareName: "",
+                        username: "",
+                        mountPoint: "~/Volumes",
+                        isEnabled: true
+                    )
+                ) { share, password in
+                    try manager.saveShare(share, password: password)
+                }
             }
-        }
-        .frame(minWidth: 720, minHeight: 480)
-        .background(.ultraThinMaterial)
-        .background(TransparentWindowBackground())
-        .sheet(item: $editedShare) { share in
-            ShareEditorView(share: share) { updated, password in
-                try manager.saveShare(updated, password: password)
+    }
+
+    private var launchAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: { launchesAtLogin },
+            set: { enabled in
+                launchesAtLogin = enabled
+                do {
+                    if enabled {
+                        try SMAppService.mainApp.register()
+                    } else {
+                        try SMAppService.mainApp.unregister()
+                    }
+                } catch {
+                    launchesAtLogin = SMAppService.mainApp.status == .enabled
+                }
             }
-        }
-        .sheet(isPresented: $isAddingShare) {
-            ShareEditorView(
-                share: ShareConfiguration(
-                    name: "",
-                    host: "",
-                    shareName: "",
-                    username: "",
-                    mountPoint: "~/Volumes",
-                    isEnabled: true
-                )
-            ) { share, password in
-                try manager.saveShare(share, password: password)
-            }
-        }
+        )
     }
 
     private var sharesView: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Shares")
-                    .font(.title2.bold())
-                Text("\(manager.shares.count) configured")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button {
-                    isAddingShare = true
-                } label: {
-                    Label("Add Share", systemImage: "plus")
-                }
-                .buttonStyle(.glassProminent)
-            }
-            .padding()
-
-            Divider()
-
+        Group {
             if manager.shares.isEmpty {
                 ContentUnavailableView {
                     Label("No Shares", systemImage: "externaldrive.badge.plus")
@@ -89,54 +102,15 @@ struct SettingsView: View {
                 }
                 .listStyle(.inset)
                 .scrollContentBackground(.hidden)
-                .safeAreaInset(edge: .bottom) {
-                    Text("Mounts begin only after the configured SMB endpoint is reachable.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                }
             }
         }
-    }
-
-    private var generalView: some View {
-        Form {
-            Section {
-                LaunchAtLoginControl()
-            } header: {
-                Text("Startup")
-            } footer: {
-                Text("ShareBeacon stays in the menu bar and reacts to network and wake events.")
-            }
-
-            Section("Diagnostics") {
-                Button("Open Log File", systemImage: "doc.text") {
-                    manager.openLog()
-                }
-                LabeledContent("Location") {
-                    Text(AppLogger.shared.logURL.path)
-                        .font(.caption.monospaced())
-                        .textSelection(.enabled)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Section("About") {
-                LabeledContent("Version") {
-                    Text(AppMetadata.versionLabel)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                }
-                LabeledContent("License") {
-                    Text("MIT")
-                        .foregroundStyle(.secondary)
-                }
-            }
+        .safeAreaInset(edge: .bottom) {
+            Text("Mounts begin only after the configured SMB endpoint is reachable.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .padding()
     }
 }
 
@@ -154,29 +128,6 @@ private struct TransparentWindowBackground: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {}
-}
-
-private struct LaunchAtLoginControl: View {
-    @State private var isEnabled = SMAppService.mainApp.status == .enabled
-    @State private var errorMessage: String?
-
-    var body: some View {
-        Toggle("Launch ShareBeacon at login", isOn: $isEnabled)
-            .onChange(of: isEnabled) { _, enabled in
-                do {
-                    if enabled {
-                        try SMAppService.mainApp.register()
-                    } else {
-                        try SMAppService.mainApp.unregister()
-                    }
-                    errorMessage = nil
-                } catch {
-                    isEnabled = SMAppService.mainApp.status == .enabled
-                    errorMessage = error.localizedDescription
-                }
-            }
-            .help(errorMessage ?? "")
-    }
 }
 
 private struct ShareSettingsRow: View {

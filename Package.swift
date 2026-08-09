@@ -17,7 +17,6 @@ let package = Package(
                 "FinderSidebarRepairer.swift",
                 "AppMetadata.swift",
                 "Logger.swift",
-                "LogsView.swift",
                 "Preview Content",
                 "SettingsView.swift",
                 "SMBShareManager.swift",
