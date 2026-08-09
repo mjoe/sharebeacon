@@ -247,24 +247,16 @@ private struct ShareSettingsRow: View {
 
             Spacer()
 
-            Text(state.label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Toggle("Enabled", isOn: enabledBinding)
-                .toggleStyle(.checkbox)
-                .labelsHidden()
-                .help(share.isEnabled ? "Disable share" : "Enable share")
-
             primaryActionButton
 
             Menu {
+                Toggle("Share is active", isOn: enabledBinding)
+                Toggle("Mount automatically", isOn: autoMountBinding)
+                Divider()
                 Button("Open in Finder", action: open)
                     .disabled(state != .mounted)
                 Button("Add to Finder Favorites", action: favorite)
                     .disabled(state != .mounted)
-                Divider()
-                Toggle("Mount automatically", isOn: autoMountBinding)
                 Divider()
                 Button("Edit…", action: edit)
                 Button("Remove…", role: .destructive, action: remove)
@@ -284,9 +276,11 @@ private struct ShareSettingsRow: View {
         case .mounted:
             Button("Unmount", action: unmount)
                 .buttonStyle(.bordered)
+                .controlSize(.small)
         case .disabled:
             Button("Mount", action: mount)
                 .buttonStyle(.bordered)
+                .controlSize(.small)
                 .disabled(true)
         case .waitingForNetwork, .mounting, .unmounting:
             ProgressView()
@@ -295,6 +289,7 @@ private struct ShareSettingsRow: View {
         case .unmounted, .failed:
             Button("Mount", action: mount)
                 .buttonStyle(.borderedProminent)
+                .controlSize(.small)
         }
     }
 
