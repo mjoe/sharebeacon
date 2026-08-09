@@ -15,7 +15,7 @@ struct ShareBeaconApp: App {
                 ForEach(shareManager.shares) { share in
                     Menu {
                         Button("Mount Now") {
-                            shareManager.mount(share)
+                            shareManager.mount(share, explicit: true)
                         }
                         .disabled(
                             shareManager.state(for: share) == .mounted ||

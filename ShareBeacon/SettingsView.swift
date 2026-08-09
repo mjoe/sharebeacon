@@ -115,7 +115,7 @@ struct SettingsView: View {
                             share: share,
                             state: manager.state(for: share),
                             hasPassword: manager.passwordExists(for: share),
-                            mount: { manager.mount(share) },
+                            mount: { manager.mount(share, explicit: true) },
                             unmount: { manager.unmount(share) },
                             open: { manager.openInFinder(share) },
                             favorite: { manager.restoreFinderFavorite(share) },

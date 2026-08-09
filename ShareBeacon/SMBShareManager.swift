@@ -173,7 +173,7 @@ final class SMBShareManager: NSObject {
         }
     }
 
-    func mount(_ share: ShareConfiguration) {
+    func mount(_ share: ShareConfiguration, explicit: Bool = false) {
         guard share.isEnabled, operations[share.id] == nil else { return }
 
         let table = MountTable.current()
@@ -197,32 +197,52 @@ final class SMBShareManager: NSObject {
         }
 
         adoptedMountPoints[share.id] = nil
-        states[share.id] = .waitingForNetwork
-        appendLog("Waiting for SMB endpoint \(share.host):445 for \(share.name).")
+        if explicit {
+            states[share.id] = .mounting
+            appendLog("Mounting \(share.name) on demand.")
+        } else {
+            states[share.id] = .waitingForNetwork
+            appendLog("Waiting for SMB endpoint \(share.host):445 for \(share.name).")
+        }
 
         operations[share.id] = Task { [weak self] in
             guard let self else { return }
             defer { operations[share.id] = nil }
 
-            let deadline = Date().addingTimeInterval(reachabilityTimeout)
-            var reachable = false
-            while !Task.isCancelled && Date() < deadline {
-                if await endpointChecker.isReachable(
+            if explicit {
+                guard await endpointChecker.isReachable(
                     host: share.host,
                     port: 445,
-                    timeout: 5
-                ) {
-                    reachable = true
-                    break
+                    timeout: 3
+                ) else {
+                    states[share.id] = .failed("SMB endpoint \(share.host) is not reachable.")
+                    appendLog(
+                        "\(share.name): \(share.host):445 is not reachable.",
+                        level: .warning
+                    )
+                    return
                 }
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
-            }
+            } else {
+                let deadline = Date().addingTimeInterval(reachabilityTimeout)
+                var reachable = false
+                while !Task.isCancelled && Date() < deadline {
+                    if await endpointChecker.isReachable(
+                        host: share.host,
+                        port: 445,
+                        timeout: 5
+                    ) {
+                        reachable = true
+                        break
+                    }
+                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                }
 
-            guard !Task.isCancelled else { return }
-            guard reachable else {
-                states[share.id] = .failed("SMB endpoint did not become reachable within 120 seconds.")
-                appendLog("Timed out waiting for \(share.host):445.", level: .warning)
-                return
+                guard !Task.isCancelled else { return }
+                guard reachable else {
+                    states[share.id] = .failed("SMB endpoint did not become reachable within 120 seconds.")
+                    appendLog("Timed out waiting for \(share.host):445.", level: .warning)
+                    return
+                }
             }
 
             states[share.id] = .mounting
