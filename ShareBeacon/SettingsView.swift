@@ -128,6 +128,13 @@ struct SettingsView: View {
                 }
                 .listStyle(.inset)
                 .scrollContentBackground(.hidden)
+                .onTapGesture(count: 2) {
+                    guard let selection,
+                          let share = manager.shares.first(where: { $0.id == selection }) else {
+                        return
+                    }
+                    editedShare = share
+                }
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -245,10 +252,6 @@ private struct ShareSettingsRow: View {
             .menuStyle(.borderlessButton)
         }
         .padding(.vertical, 6)
-        .contentShape(Rectangle())
-        .simultaneousGesture(TapGesture(count: 2).onEnded {
-            edit()
-        })
         .help("Double-click to edit")
     }
 
