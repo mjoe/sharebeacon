@@ -183,9 +183,16 @@ final class SMBShareManager: NSObject {
         appendLog("Deleted shared credential for \(credential.username)@\(credential.host).")
     }
 
-    func mountAll() {
+    func mountAutoMountingShares() {
         refreshMountStates()
         for share in sharesWaitingForAutoMount {
+            mount(share)
+        }
+    }
+
+    func mountAllEnabled() {
+        refreshMountStates()
+        for share in shares where share.isEnabled && state(for: share) != .mounted {
             mount(share)
         }
     }
@@ -400,7 +407,7 @@ final class SMBShareManager: NSObject {
             guard path.status == .satisfied else { return }
             Task { @MainActor in
                 self?.appendLog("Network path changed; checking configured shares.")
-                self?.mountAll()
+                self?.mountAutoMountingShares()
             }
         }
         monitor.start(queue: DispatchQueue(label: "com.mjoe.sharebeacon.network"))
@@ -425,23 +432,23 @@ final class SMBShareManager: NSObject {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(retryInterval))
                 guard !Task.isCancelled else { return }
-                self?.mountAll()
+                self?.mountAutoMountingShares()
             }
         }
 
         Task { @MainActor in
-            mountAll()
+            mountAutoMountingShares()
         }
     }
 
     @objc private func didWake() {
         appendLog("Mac woke from sleep; checking configured shares.")
-        mountAll()
+        mountAutoMountingShares()
     }
 
     @objc private func volumeDidUnmount() {
         refreshMountStates()
-        mountAll()
+        mountAutoMountingShares()
     }
 
     private func appendLog(_ message: String, level: LogLevel = .info) {

@@ -54,7 +54,7 @@ struct ShareBeaconApp: App {
             Divider()
 
             Button("Mount All") {
-                shareManager.mountAll()
+                shareManager.mountAllEnabled()
             }
             .disabled(!hasSharesWaitingToMount)
 
@@ -92,7 +92,9 @@ struct ShareBeaconApp: App {
     }
 
     private var hasSharesWaitingToMount: Bool {
-        !shareManager.sharesWaitingForAutoMount.isEmpty
+        shareManager.shares.contains {
+            $0.isEnabled && shareManager.state(for: $0) != .mounted
+        }
     }
 
     private var menuBarSymbol: String {
