@@ -127,13 +127,13 @@ struct SettingsView: View {
                             selection == share.id ? Color.accentColor.opacity(0.14) : nil
                         )
                         .contentShape(Rectangle())
-                        .onTapGesture(count: 1) {
+                        .simultaneousGesture(TapGesture().onEnded {
                             selection = share.id
-                        }
-                        .onTapGesture(count: 2) {
+                        })
+                        .simultaneousGesture(TapGesture(count: 2).onEnded {
                             selection = share.id
                             editedShare = share
-                        }
+                        })
                     }
                 }
                 .listStyle(.inset)
