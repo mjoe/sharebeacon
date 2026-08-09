@@ -185,12 +185,17 @@ final class SMBShareManager: NSObject {
 
     func mountAll() {
         refreshMountStates()
-        for share in shares
-        where share.isEnabled
-            && share.autoMount
-            && !manuallyUnmounted.contains(share.id)
-            && state(for: share) != .mounted {
+        for share in sharesWaitingForAutoMount {
             mount(share)
+        }
+    }
+
+    var sharesWaitingForAutoMount: [ShareConfiguration] {
+        shares.filter {
+            $0.isEnabled
+                && $0.autoMount
+                && !manuallyUnmounted.contains($0.id)
+                && state(for: $0) != .mounted
         }
     }
 
