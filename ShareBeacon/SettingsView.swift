@@ -32,9 +32,6 @@ struct SettingsView: View {
                         Button("View Activity", systemImage: "doc.text") {
                             openWindow(id: "activity")
                         }
-                        Button("Open Log File", systemImage: "doc.plaintext") {
-                            manager.openLog()
-                        }
                     } label: {
                         Label("More", systemImage: "ellipsis.circle")
                     }

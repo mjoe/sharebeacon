@@ -355,10 +355,6 @@ final class SMBShareManager: NSObject {
         NSWorkspace.shared.open(URL(fileURLWithPath: path))
     }
 
-    func openLog() {
-        NSWorkspace.shared.open(AppLogger.shared.logURL)
-    }
-
     func restoreFinderFavorite(_ share: ShareConfiguration) {
         guard state(for: share) == .mounted else { return }
         if finderSidebarRepairer.restoreFavorite(for: share, at: adoptedMountPoints[share.id]) {
