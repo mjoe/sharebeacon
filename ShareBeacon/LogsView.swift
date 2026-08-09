@@ -13,6 +13,7 @@ struct LogsView: View {
                     Text("Errors").tag(LogLevel.error)
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
                 .frame(width: 190)
                 .help("Show entries at this level or above")
 

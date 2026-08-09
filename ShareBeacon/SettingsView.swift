@@ -4,6 +4,7 @@ import SwiftUI
 
 enum SettingsTab: String {
     case shares
+    case general
     case log
 }
 
@@ -21,6 +22,10 @@ struct SettingsView: View {
             sharesTab
                 .tabItem { Label("Shares", systemImage: "externaldrive") }
                 .tag(SettingsTab.shares.rawValue)
+
+            generalTab
+                .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(SettingsTab.general.rawValue)
 
             LogsView()
                 .environment(AppLogger.shared)
@@ -85,26 +90,12 @@ struct SettingsView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            VStack(alignment: .leading, spacing: 10) {
-                LabeledContent {
-                    Toggle("Launch at Login", isOn: launchAtLoginBinding)
-                        .toggleStyle(.switch)
-                } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Launch at Login")
-                        Text("Start ShareBeacon automatically when you sign in.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.vertical, 4)
-                Text("Mounts begin only after the configured SMB endpoint is reachable.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            Text("Mounts begin only after the configured SMB endpoint is reachable.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
         }
         .alert(
             "Remove Share?",
@@ -160,6 +151,21 @@ struct SettingsView: View {
                 try manager.saveShare(share, password: password)
             }
         }
+    }
+
+    private var generalTab: some View {
+        Form {
+            Toggle(isOn: launchAtLoginBinding) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Launch at Login")
+                    Text("Start ShareBeacon automatically when you sign in.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .frame(minWidth: 640, minHeight: 440)
     }
 
     private var launchAtLoginBinding: Binding<Bool> {
