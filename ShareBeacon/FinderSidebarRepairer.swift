@@ -41,12 +41,12 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
             logError("Could not read Finder \(label) list.")
             return false
         }
-        let items = snapshot as NSArray
+        let items = snapshot as! [Any]
         guard !items.isEmpty else {
             logError("Finder \(label) list has no valid insertion point.")
             return false
         }
-        let lastItem = items.lastObject as! LSSharedFileListItem
+        let lastItem = items.last as! LSSharedFileListItem
 
         var existing: LSSharedFileListItem?
         for item in items {
