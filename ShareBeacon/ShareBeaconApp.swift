@@ -59,7 +59,7 @@ struct ShareBeaconApp: App {
             .disabled(!hasSharesWaitingToMount)
 
             SettingsLink {
-                Text("Preferences…")
+                Text("Settings…")
             }
             .keyboardShortcut(",")
 
