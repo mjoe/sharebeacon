@@ -246,9 +246,9 @@ private struct ShareSettingsRow: View {
         }
         .padding(.vertical, 6)
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
+        .simultaneousGesture(TapGesture(count: 2).onEnded {
             edit()
-        }
+        })
         .help("Double-click to edit")
     }
 
