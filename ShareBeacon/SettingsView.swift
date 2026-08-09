@@ -4,7 +4,9 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(SMBShareManager.self) private var manager
+    @Environment(\.openWindow) private var openWindow
     @State private var editedShare: ShareConfiguration?
+    @State private var sharePendingRemoval: ShareConfiguration?
     @State private var isAddingShare = false
     @State private var launchesAtLogin = SMAppService.mainApp.status == .enabled
 
@@ -26,7 +28,10 @@ struct SettingsView: View {
                     Menu {
                         Toggle("Launch at Login", isOn: launchAtLoginBinding)
                         Divider()
-                        Button("Open Log File", systemImage: "doc.text") {
+                        Button("View Activity", systemImage: "doc.text") {
+                            openWindow(id: "activity")
+                        }
+                        Button("Open Log File", systemImage: "doc.plaintext") {
                             manager.openLog()
                         }
                     } label: {
@@ -34,6 +39,25 @@ struct SettingsView: View {
                     }
                     .help("Settings and diagnostics")
                 }
+            }
+            .alert(
+                "Remove Share?",
+                isPresented: Binding(
+                    get: { sharePendingRemoval != nil },
+                    set: { if !$0 { sharePendingRemoval = nil } }
+                )
+            ) {
+                Button("Remove", role: .destructive) {
+                    if let share = sharePendingRemoval {
+                        manager.removeShare(share)
+                    }
+                    sharePendingRemoval = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    sharePendingRemoval = nil
+                }
+            } message: {
+                Text("The configuration and stored Keychain password for \"\(sharePendingRemoval?.name ?? "")\" will be removed.")
             }
             .sheet(item: $editedShare) { share in
                 ShareEditorView(share: share) { updated, password in
@@ -96,7 +120,7 @@ struct SettingsView: View {
                             favorite: { manager.restoreFinderFavorite(share) },
                             edit: { editedShare = share },
                             toggle: { manager.setEnabled(!share.isEnabled, for: share) },
-                            remove: { manager.removeShare(share) }
+                            remove: { sharePendingRemoval = share }
                         )
                     }
                 }
@@ -142,6 +166,10 @@ private struct ShareSettingsRow: View {
     let toggle: () -> Void
     let remove: () -> Void
 
+    private var enabledBinding: Binding<Bool> {
+        Binding(get: { share.isEnabled }, set: { _ in toggle() })
+    }
+
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: state.symbolName)
@@ -184,6 +212,19 @@ private struct ShareSettingsRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+            Toggle("Enabled", isOn: enabledBinding)
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+                .help(share.isEnabled ? "Disable share" : "Enable share")
+
+            Button(role: .destructive) {
+                remove()
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.plain)
+            .help("Remove share")
+
             Menu {
                 Button("Mount Now", action: mount)
                     .disabled(state == .mounted || !share.isEnabled)
@@ -195,7 +236,6 @@ private struct ShareSettingsRow: View {
                     .disabled(state != .mounted)
                 Divider()
                 Button("Edit…", action: edit)
-                Button(share.isEnabled ? "Disable" : "Enable", action: toggle)
                 Button("Remove…", role: .destructive, action: remove)
             } label: {
                 Image(systemName: "ellipsis.circle")
@@ -203,6 +243,11 @@ private struct ShareSettingsRow: View {
             .menuStyle(.borderlessButton)
         }
         .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            edit()
+        }
+        .help("Double-click to edit")
     }
 
     private var statusColor: Color {
