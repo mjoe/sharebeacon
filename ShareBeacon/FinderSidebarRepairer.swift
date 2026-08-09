@@ -1,13 +1,15 @@
 @preconcurrency import CoreServices
 import Foundation
 
+@MainActor
 protocol FinderSidebarRepairing: Sendable {
-    func restoreFavorite(for share: ShareConfiguration) -> Bool
+    func restoreFavorite(for share: ShareConfiguration, at mountPoint: String?) -> Bool
 }
-
+@MainActor
 struct FinderSidebarRepairer: FinderSidebarRepairing {
-    func restoreFavorite(for share: ShareConfiguration) -> Bool {
-        let mountURL = URL(fileURLWithPath: share.normalizedMountPoint, isDirectory: true)
+    func restoreFavorite(for share: ShareConfiguration, at mountPoint: String? = nil) -> Bool {
+        let path = mountPoint ?? share.normalizedMountPoint
+        let mountURL = URL(fileURLWithPath: path, isDirectory: true)
         let volumeResult = restore(
             mountURL: mountURL,
             name: share.name,

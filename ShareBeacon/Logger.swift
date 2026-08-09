@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import os
 
 enum LogLevel: String, Codable {
@@ -27,58 +28,70 @@ struct AppLogEntry: Codable, Identifiable, Equatable {
     }
 }
 
-final class AppLogger: @unchecked Sendable {
+@MainActor
+@Observable
+final class AppLogger {
     static let shared = AppLogger()
 
-    private let systemLogger = Logger(
+    private(set) var recentEntries: [AppLogEntry] = []
+
+    nonisolated private static let systemLogger = Logger(
         subsystem: "com.mjoe.sharebeacon",
         category: "mount"
     )
-    private let queue = DispatchQueue(label: "com.mjoe.sharebeacon.log")
-    private let maximumBytes: UInt64 = 2 * 1_024 * 1_024
+    private static let queue = DispatchQueue(label: "com.mjoe.sharebeacon.log")
+    private static let maximumBytes: UInt64 = 2 * 1_024 * 1_024
 
     var logURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Logs/sharebeacon.log")
     }
 
-    func write(_ message: String, level: LogLevel = .info) {
+    func record(_ message: String, level: LogLevel = .info) {
+        let entry = AppLogEntry(level: level, message: message)
+        recentEntries.append(entry)
+        if recentEntries.count > 200 {
+            recentEntries.removeFirst(recentEntries.count - 200)
+        }
+
         let sanitized = Self.sanitize(message)
         switch level {
         case .debug:
-            systemLogger.debug("\(sanitized, privacy: .public)")
+            Self.systemLogger.debug("\(sanitized, privacy: .public)")
         case .info:
-            systemLogger.info("\(sanitized, privacy: .public)")
+            Self.systemLogger.info("\(sanitized, privacy: .public)")
         case .warning:
-            systemLogger.warning("\(sanitized, privacy: .public)")
+            Self.systemLogger.warning("\(sanitized, privacy: .public)")
         case .error:
-            systemLogger.error("\(sanitized, privacy: .public)")
+            Self.systemLogger.error("\(sanitized, privacy: .public)")
         }
 
-        queue.async {
-            self.rotateIfNeeded()
+        let logURL = self.logURL
+        let maximumBytes = Self.maximumBytes
+        Self.queue.async {
+            Self.rotateIfNeededIfNeeded(at: logURL, maximumBytes: maximumBytes)
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             let line = "\(formatter.string(from: Date())) [\(level.rawValue)] \(sanitized)\n"
             guard let data = line.data(using: .utf8) else { return }
 
-            if !FileManager.default.fileExists(atPath: self.logURL.path) {
-                FileManager.default.createFile(atPath: self.logURL.path, contents: data)
+            if !FileManager.default.fileExists(atPath: logURL.path) {
+                FileManager.default.createFile(atPath: logURL.path, contents: data)
                 return
             }
 
             do {
-                let handle = try FileHandle(forWritingTo: self.logURL)
+                let handle = try FileHandle(forWritingTo: logURL)
                 try handle.seekToEnd()
                 try handle.write(contentsOf: data)
                 try handle.close()
             } catch {
-                self.systemLogger.error("Failed writing file log: \(error.localizedDescription)")
+                Self.systemLogger.error("Failed writing file log: \(error.localizedDescription)")
             }
         }
     }
 
-    private func rotateIfNeeded() {
+    nonisolated private static func rotateIfNeededIfNeeded(at logURL: URL, maximumBytes: UInt64) {
         guard
             let attributes = try? FileManager.default.attributesOfItem(atPath: logURL.path),
             let size = attributes[.size] as? UInt64,
@@ -107,18 +120,22 @@ final class AppLogger: @unchecked Sendable {
     }
 }
 
+@MainActor
 func logDebug(_ message: String) {
-    AppLogger.shared.write(message, level: .debug)
+    AppLogger.shared.record(message, level: .debug)
 }
 
+@MainActor
 func logInfo(_ message: String) {
-    AppLogger.shared.write(message, level: .info)
+    AppLogger.shared.record(message, level: .info)
 }
 
+@MainActor
 func logWarning(_ message: String) {
-    AppLogger.shared.write(message, level: .warning)
+    AppLogger.shared.record(message, level: .warning)
 }
 
+@MainActor
 func logError(_ message: String) {
-    AppLogger.shared.write(message, level: .error)
+    AppLogger.shared.record(message, level: .error)
 }

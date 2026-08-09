@@ -8,8 +8,8 @@ private actor MountOperationRunner {
         try mounter.mount(share, password: password)
     }
 
-    func unmount(_ mounter: ShareMounting, share: ShareConfiguration) throws {
-        try mounter.unmount(share)
+    func unmount(_ mounter: ShareMounting, share: ShareConfiguration, at mountPoint: String) throws {
+        try mounter.unmount(share, at: mountPoint)
     }
 }
 
@@ -52,7 +52,6 @@ enum ShareRuntimeState: Equatable {
 final class SMBShareManager: NSObject {
     private(set) var shares: [ShareConfiguration] = []
     private(set) var states: [UUID: ShareRuntimeState] = [:]
-    private(set) var logs: [AppLogEntry] = []
 
     @ObservationIgnored private let credentialStore: CredentialStoring
     @ObservationIgnored private let endpointChecker: EndpointChecking
@@ -66,6 +65,7 @@ final class SMBShareManager: NSObject {
     @ObservationIgnored private var networkMonitor: NWPathMonitor?
     @ObservationIgnored private var retryTask: Task<Void, Never>?
     @ObservationIgnored private var operations: [UUID: Task<Void, Never>] = [:]
+    @ObservationIgnored private var adoptedMountPoints: [UUID: String] = [:]
     @ObservationIgnored private let operationRunner = MountOperationRunner()
 
     init(
@@ -129,11 +129,7 @@ final class SMBShareManager: NSObject {
 
         if needsReconciliation,
            let existing,
-           MountTable.current().isMounted(
-               host: existing.host,
-               share: existing.shareName,
-               at: existing.normalizedMountPoint
-           ) {
+           MountTable.current().mountPoint(host: existing.host, share: existing.shareName) != nil {
             unmount(existing, thenMount: share.isEnabled ? share : nil)
         } else if share.isEnabled {
             mount(share)
@@ -143,14 +139,11 @@ final class SMBShareManager: NSObject {
     func removeShare(_ share: ShareConfiguration, removeCredential: Bool = true) {
         operations[share.id]?.cancel()
         operations[share.id] = nil
+        adoptedMountPoints[share.id] = nil
         if removeCredential {
             try? credentialStore.deletePassword(for: share)
         }
-        if MountTable.current().isMounted(
-            host: share.host,
-            share: share.shareName,
-            at: share.normalizedMountPoint
-        ) {
+        if MountTable.current().mountPoint(host: share.host, share: share.shareName) != nil {
             unmount(share)
         }
         shares.removeAll { $0.id == share.id }
@@ -174,15 +167,28 @@ final class SMBShareManager: NSObject {
 
     func mount(_ share: ShareConfiguration) {
         guard share.isEnabled, operations[share.id] == nil else { return }
-        guard !MountTable.current().isMounted(
-            host: share.host,
-            share: share.shareName,
-            at: share.normalizedMountPoint
-        ) else {
-            states[share.id] = .mounted
+
+        let table = MountTable.current()
+        if let existingPoint = table.mountPoint(host: share.host, share: share.shareName) {
+            let configuredPoint = share.normalizedMountPoint
+            if existingPoint == configuredPoint {
+                adoptedMountPoints[share.id] = nil
+                states[share.id] = .mounted
+            } else {
+                adoptedMountPoints[share.id] = existingPoint
+                states[share.id] = .mounted
+                appendLog(
+                    "\(share.name) is already mounted at \(existingPoint); using the existing mount.",
+                    level: .warning
+                )
+                if finderSidebarRepairer.restoreFavorite(for: share, at: existingPoint) {
+                    appendLog("Restored Finder favorite for \(share.name).")
+                }
+            }
             return
         }
 
+        adoptedMountPoints[share.id] = nil
         states[share.id] = .waitingForNetwork
         appendLog("Waiting for SMB endpoint \(share.host):445 for \(share.name).")
 
@@ -221,7 +227,7 @@ final class SMBShareManager: NSObject {
                 try await operationRunner.mount(mounter, share: share, password: password)
                 states[share.id] = .mounted
                 appendLog("Mounted \(share.name) at \(share.normalizedMountPoint).")
-                if finderSidebarRepairer.restoreFavorite(for: share) {
+                if finderSidebarRepairer.restoreFavorite(for: share, at: nil) {
                     appendLog("Restored Finder favorite for \(share.name).")
                 }
             } catch {
@@ -250,7 +256,8 @@ final class SMBShareManager: NSObject {
             }
 
             do {
-                try await operationRunner.unmount(mounter, share: share)
+                try await operationRunner.unmount(mounter, share: share, at: adoptedMountPoints[share.id] ?? share.normalizedMountPoint)
+                adoptedMountPoints[share.id] = nil
                 if let current = shares.first(where: { $0.id == share.id }) {
                     states[share.id] = current.isEnabled ? .unmounted : .disabled
                 } else {
@@ -265,7 +272,8 @@ final class SMBShareManager: NSObject {
     }
 
     func openInFinder(_ share: ShareConfiguration) {
-        NSWorkspace.shared.open(URL(fileURLWithPath: share.normalizedMountPoint))
+        let path = adoptedMountPoints[share.id] ?? share.normalizedMountPoint
+        NSWorkspace.shared.open(URL(fileURLWithPath: path))
     }
 
     func openLog() {
@@ -274,7 +282,7 @@ final class SMBShareManager: NSObject {
 
     func restoreFinderFavorite(_ share: ShareConfiguration) {
         guard state(for: share) == .mounted else { return }
-        if finderSidebarRepairer.restoreFavorite(for: share) {
+        if finderSidebarRepairer.restoreFavorite(for: share, at: adoptedMountPoints[share.id]) {
             appendLog("Restored Finder favorite for \(share.name).")
         }
     }
@@ -282,13 +290,15 @@ final class SMBShareManager: NSObject {
     func refreshMountStates() {
         let table = MountTable.current()
         for share in shares {
-            if table.isMounted(
-                host: share.host,
-                share: share.shareName,
-                at: share.normalizedMountPoint
-            ) {
+            if let existingPoint = table.mountPoint(host: share.host, share: share.shareName) {
+                adoptedMountPoints[share.id] =
+                    existingPoint == share.normalizedMountPoint ? nil : existingPoint
                 states[share.id] = .mounted
             } else if operations[share.id] == nil {
+                adoptedMountPoints[share.id] = nil
+                if case .failed = states[share.id] {
+                    continue
+                }
                 states[share.id] = share.isEnabled ? .unmounted : .disabled
             }
         }
@@ -363,11 +373,6 @@ final class SMBShareManager: NSObject {
     }
 
     private func appendLog(_ message: String, level: LogLevel = .info) {
-        let entry = AppLogEntry(level: level, message: message)
-        logs.append(entry)
-        if logs.count > 200 {
-            logs.removeFirst(logs.count - 200)
-        }
-        AppLogger.shared.write(message, level: level)
+        AppLogger.shared.record(message, level: level)
     }
 }

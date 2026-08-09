@@ -82,6 +82,7 @@ struct ShareBeaconApp: App {
         Settings {
             SettingsView()
                 .environment(shareManager)
+                .environment(AppLogger.shared)
         }
     }
 

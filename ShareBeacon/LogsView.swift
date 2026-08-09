@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LogsView: View {
-    @Environment(SMBShareManager.self) private var manager
+    @Environment(AppLogger.self) private var logger
 
     var body: some View {
         VStack(spacing: 0) {
@@ -10,14 +10,15 @@ struct LogsView: View {
                     .font(.title2.bold())
                 Spacer()
                 Button("Open Log File", systemImage: "doc.text") {
-                    manager.openLog()
+                    AppLogger.shared.record("Opening log file.", level: .debug)
+                    NSWorkspace.shared.open(AppLogger.shared.logURL)
                 }
             }
             .padding()
 
             Divider()
 
-            Table(manager.logs.reversed()) {
+            Table(logger.recentEntries.reversed()) {
                 TableColumn("Time") { entry in
                     Text(entry.timestamp.formatted(date: .omitted, time: .standard))
                 }

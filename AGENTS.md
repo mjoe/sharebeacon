@@ -24,7 +24,19 @@ and restoring Finder sidebar favorites after reconnects.
 
 ## Verification
 
-- `swift test`
+- `swift test` (this machine needs the Xcode toolchain + SDK; see below)
 - `swiftlint --strict` when SwiftLint is installed
 - `xcodebuild -project ShareBeacon.xcodeproj -scheme ShareBeacon -configuration Debug build`
 - `git diff --check`
+
+### Running tests on this machine
+
+`xcode-select` points at CommandLineTools, whose toolchain has no `Testing`
+module. Run the package tests with the Xcode toolchain and SDK instead:
+
+```bash
+SDKROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.sdk \
+DYLD_FRAMEWORK_PATH=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks \
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift test \
+  -Xswiftc -F -Xswiftc /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks
+```

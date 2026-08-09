@@ -61,6 +61,17 @@ struct ShareBeaconCoreTests {
         ))
     }
 
+    @Test("mount table finds an existing mount at a different point")
+    func mountTableFindsExistingMountAtDifferentPoint() {
+        let output = """
+        //user@nas.example.test/data on /Volumes/data (smbfs, nodev, nosuid, mounted by tester)
+        """
+        let table = MountTable(output: output)
+
+        #expect(table.mountPoint(host: "nas.example.test", share: "data") == "/Volumes/data")
+        #expect(table.mountPoint(host: "nas.example.test", share: "missing") == nil)
+    }
+
     @Test("SMB URL contains no credential material")
     func smbURLContainsNoCredentialMaterial() throws {
         let share = ShareConfiguration(

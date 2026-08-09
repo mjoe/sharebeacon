@@ -163,27 +163,34 @@ struct MountTable: Sendable {
         self.entries = entries
     }
 
+    private func normalizedSource(_ value: String) -> String {
+        var lowercased = (value.removingPercentEncoding ?? value).lowercased()
+        if let atIndex = lowercased.firstIndex(of: "@") {
+            lowercased = "//" + lowercased[lowercased.index(after: atIndex)...]
+        }
+        return lowercased
+    }
+
+    private func normalizedMountPoint(_ value: String) -> String {
+        let decoded = value.removingPercentEncoding ?? value
+        return URL(fileURLWithPath: decoded).standardizedFileURL.path
+    }
+
+    private func matches(_ entry: Entry, host: String, share: String) -> Bool {
+        normalizedSource(entry.source) == normalizedSource("//\(host)/\(share)")
+    }
+
     func isMounted(host: String, share: String, at mountPoint: String) -> Bool {
         let expectedMountPoint = URL(fileURLWithPath: mountPoint).standardizedFileURL.path
-        let rawExpectedSource = "//\(host.lowercased())/\(share)"
-        let expectedSource = (rawExpectedSource.removingPercentEncoding ?? rawExpectedSource)
-            .lowercased()
-
         return entries.contains { entry in
-            let decodedSource = (entry.source.removingPercentEncoding ?? entry.source).lowercased()
-            let decodedMountPoint = entry.mountPoint.removingPercentEncoding ?? entry.mountPoint
-            let normalizedMountPoint = URL(fileURLWithPath: decodedMountPoint)
-                .standardizedFileURL.path
-
-            let sourceWithoutUser: String
-            if let atIndex = decodedSource.firstIndex(of: "@") {
-                sourceWithoutUser = "//" + decodedSource[decodedSource.index(after: atIndex)...]
-            } else {
-                sourceWithoutUser = decodedSource
-            }
-
-            return sourceWithoutUser == expectedSource && normalizedMountPoint == expectedMountPoint
+            matches(entry, host: host, share: share)
+                && normalizedMountPoint(entry.mountPoint) == expectedMountPoint
         }
+    }
+
+    func mountPoint(host: String, share: String) -> String? {
+        entries.first(where: { matches($0, host: host, share: share) })
+            .map { normalizedMountPoint($0.mountPoint) }
     }
 
     static func current() -> MountTable {
@@ -351,7 +358,7 @@ private final class EndpointCheckCompletion: @unchecked Sendable {
 
 protocol ShareMounting: Sendable {
     func mount(_ share: ShareConfiguration, password: String) throws
-    func unmount(_ share: ShareConfiguration) throws
+    func unmount(_ share: ShareConfiguration, at mountPoint: String) throws
 }
 
 struct NetFSShareMounter: ShareMounting {
@@ -389,10 +396,10 @@ struct NetFSShareMounter: ShareMounting {
         }
     }
 
-    func unmount(_ share: ShareConfiguration) throws {
+    func unmount(_ share: ShareConfiguration, at mountPoint: String) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
-        process.arguments = ["unmount", share.normalizedMountPoint]
+        process.arguments = ["unmount", mountPoint]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
 
