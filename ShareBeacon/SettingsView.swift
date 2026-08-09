@@ -215,13 +215,19 @@ private struct ShareSettingsRow: View {
                 HStack {
                     Text(share.name)
                         .font(.headline)
-                    if !share.isEnabled {
-                        Text("Disabled")
+                    if share.isEnabled && share.autoMount {
+                        Image(systemName: "arrow.triangle.2.circlepath")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .help("Mounts automatically when available")
+                    } else if share.isEnabled {
+                        Image(systemName: "hand.tap")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .help("Mounts on demand only")
                     }
-                    if share.isEnabled && !share.autoMount {
-                        Text("On demand")
+                    if !share.isEnabled {
+                        Text("Disabled")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
