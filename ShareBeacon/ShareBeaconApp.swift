@@ -69,11 +69,11 @@ struct ShareBeaconApp: App {
 
             Divider()
 
-            Button("About ShareBeacon") {
+            Button("About") {
                 NSApplication.shared.orderFrontStandardAboutPanel(nil)
             }
 
-            Button("Quit ShareBeacon") {
+            Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")
