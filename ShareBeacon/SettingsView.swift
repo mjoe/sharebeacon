@@ -27,7 +27,7 @@ struct SettingsView: View {
                 .tabItem { Label("Log", systemImage: "doc.text") }
                 .tag(SettingsTab.log.rawValue)
         }
-        .tabViewStyle(.sidebarAdaptable)
+        .tabViewStyle(.tabBarOnly)
         .frame(minWidth: 640, minHeight: 440)
     }
 
