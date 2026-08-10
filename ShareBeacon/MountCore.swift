@@ -94,19 +94,6 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
         )
     }
 
-    static func defaultShare(homeDirectory: String = NSHomeDirectory()) -> ShareConfiguration {
-        ShareConfiguration(
-            name: "NAS Data",
-            host: "nas.taila7f773.ts.net",
-            shareName: "data",
-            username: "ubani",
-            mountPoint: URL(fileURLWithPath: homeDirectory)
-                .appendingPathComponent("Volumes/data")
-                .path,
-            isEnabled: true
-        )
-    }
-
     static func validate(_ shares: [ShareConfiguration]) throws {
         var identifiers = Set<UUID>()
         var mountPoints = Set<String>()

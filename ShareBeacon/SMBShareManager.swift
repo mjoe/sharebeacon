@@ -389,7 +389,7 @@ final class SMBShareManager: NSObject {
             let decoded = try? JSONDecoder().decode([ShareConfiguration].self, from: data),
             (try? ShareConfiguration.validate(decoded)) != nil
         else {
-            shares = [.defaultShare()]
+            shares = []
             saveShares()
             return
         }

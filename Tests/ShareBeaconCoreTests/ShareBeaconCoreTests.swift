@@ -4,17 +4,6 @@ import Testing
 
 @Suite("ShareBeacon core")
 struct ShareBeaconCoreTests {
-    @Test("default share uses generic SMB endpoint and home mount point")
-    func defaultShareUsesGenericSMBEndpointAndHomeMountPoint() {
-        let share = ShareConfiguration.defaultShare(homeDirectory: "/Users/tester")
-
-        #expect(share.host == "nas.taila7f773.ts.net")
-        #expect(share.shareName == "data")
-        #expect(share.username == "ubani")
-        #expect(share.mountPoint == "/Users/tester/Volumes/data")
-        #expect(share.isEnabled)
-    }
-
     @Test("configuration encoding never contains a password")
     func configurationEncodingNeverContainsPassword() throws {
         let share = ShareConfiguration(
