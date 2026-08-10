@@ -36,10 +36,10 @@ final class AppLogger {
     private(set) var recentEntries: [AppLogEntry] = []
 
     nonisolated private static let systemLogger = Logger(
-        subsystem: "com.mjoe.sharebeacon",
+        subsystem: "org.mjoe.sharebeacon",
         category: "mount"
     )
-    private static let queue = DispatchQueue(label: "com.mjoe.sharebeacon.log")
+    private static let queue = DispatchQueue(label: "org.mjoe.sharebeacon.log")
     private static let maximumBytes: UInt64 = 2 * 1_024 * 1_024
 
     var logURL: URL {

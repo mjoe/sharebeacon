@@ -28,7 +28,7 @@ cask "sharebeacon" do
 
   zap trash: [
     "~/Library/Logs/sharebeacon.log",
-    "~/Library/Preferences/com.mjoe.sharebeacon.plist",
+    "~/Library/Preferences/org.mjoe.sharebeacon.plist",
   ]
 
   caveats <<~EOS

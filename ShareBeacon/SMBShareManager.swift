@@ -411,7 +411,7 @@ final class SMBShareManager: NSObject {
                 self.mountAutoMountingShares()
             }
         }
-        monitor.start(queue: DispatchQueue(label: "com.mjoe.sharebeacon.network"))
+        monitor.start(queue: DispatchQueue(label: "org.mjoe.sharebeacon.network"))
         networkMonitor = monitor
 
         NSWorkspace.shared.notificationCenter.addObserver(

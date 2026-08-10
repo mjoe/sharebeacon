@@ -399,7 +399,7 @@ protocol CredentialStoring: Sendable {
 
 final class KeychainCredentialStore: CredentialStoring, @unchecked Sendable {
     static let shared = KeychainCredentialStore()
-    private let service = "com.mjoe.sharebeacon.smb"
+    private let service = "org.mjoe.sharebeacon.smb"
     private static let sharedAccountPrefix = "shared:"
 
     private func query(account: String) -> [String: Any] {
@@ -539,7 +539,7 @@ struct SMBEndpointChecker: EndpointChecking {
         }
 
         return await withCheckedContinuation { continuation in
-            let queue = DispatchQueue(label: "com.mjoe.sharebeacon.endpoint-check")
+            let queue = DispatchQueue(label: "org.mjoe.sharebeacon.endpoint-check")
             let connection = NWConnection(
                 host: NWEndpoint.Host(host),
                 port: endpointPort,
