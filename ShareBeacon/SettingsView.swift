@@ -162,13 +162,13 @@ struct SettingsView: View {
                 }
             }
             Section {
-                LabeledContent("Version") {
-                    Text(AppMetadata.versionLabel)
-                }
                 LabeledContent("Project") {
                     Link(destination: AppMetadata.projectURL) {
                         Label("mjoe/sharebeacon", systemImage: "arrow.up.right.square")
                     }
+                }
+                LabeledContent("Version") {
+                    Text(AppMetadata.versionLabel)
                 }
             }
         }
