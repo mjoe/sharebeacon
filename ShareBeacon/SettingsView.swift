@@ -167,7 +167,7 @@ struct SettingsView: View {
                 }
                 LabeledContent("Project") {
                     Link(destination: AppMetadata.projectURL) {
-                        Label("View on GitHub", systemImage: "arrow.up.right.square")
+                        Label("mjoe/sharebeacon", systemImage: "arrow.up.right.square")
                     }
                 }
             }

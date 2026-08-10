@@ -75,7 +75,9 @@ struct ShareBeaconApp: App {
 
             Button("About") {
                 NSApp.activate(ignoringOtherApps: true)
-                NSApplication.shared.orderFrontStandardAboutPanel(nil)
+                NSApplication.shared.orderFrontStandardAboutPanel(
+                    options: [.credits: AppMetadata.aboutCredits]
+                )
             }
 
             Button("Quit") {
