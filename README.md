@@ -28,7 +28,8 @@ sidebar favorites after a share reconnects.
 ## Versioning
 
 ShareBeacon uses a two-part product version, currently `0.6`.
-Release tags use the same format, for example `v0.6`. Build numbers are
+Release tags use the same format, for example `v0.6`. Release titles are
+`ShareBeacon <version>` (for example `ShareBeacon 0.6`). Build numbers are
 separate and increase for each CI build.
 
 ## Build and Test
