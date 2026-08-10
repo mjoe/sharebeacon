@@ -1,6 +1,9 @@
 ## Remove new local build directory
 derived_data
 
+# Local helper with notarization credentials
+scripts/notarized-build.sh
+
 ## macOS
 .DS_Store
 
