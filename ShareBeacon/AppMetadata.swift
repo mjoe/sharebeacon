@@ -11,7 +11,7 @@ enum AppMetadata {
                 string: "Project: ",
                 attributes: [
                     .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
-                    .foregroundColor: NSColor.secondaryLabelColor,
+                    .foregroundColor: NSColor.secondaryLabelColor
                 ]
             )
         )
@@ -20,7 +20,7 @@ enum AppMetadata {
                 string: "mjoe/sharebeacon",
                 attributes: [
                     .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
-                    .link: projectURL,
+                    .link: projectURL
                 ]
             )
         )
