@@ -12,6 +12,7 @@ sidebar favorites after a share reconnects.
 - Shared Keychain credentials reused across shares
 - Serialized mount operations and endpoint readiness checks
 - Automatic recovery after login, network changes, sleep/wake, and disconnects
+- Sleep-aware: pauses all monitoring and mount activity while the Mac sleeps
 - Credentials kept out of URLs, configuration, process arguments, and logs
 - User-owned or `/Volumes` mount points
 - Settings window with Shares, General, and Log tabs (live log with level filter)
@@ -62,6 +63,15 @@ To create a favorite initially, configure and save the share, mount it, then
 choose **Add to Finder Favorites** from that share's menu. ShareBeacon also
 attempts this automatically after every successful reconnect. If Finder does
 not refresh immediately, relaunch Finder once.
+
+## Sleep Mode
+
+ShareBeacon respects the Mac's sleep mode. When the system begins sleeping it
+pauses all share monitoring, cancels in-flight mount operations, and starts no
+new reconnection attempts. After the Mac wakes it resumes automatically, waits
+a short network grace period so the connection is ready, and then reconnects
+shares that are configured to mount automatically. ShareBeacon never keeps the
+Mac awake or blocks it from sleeping.
 
 ## Credits
 

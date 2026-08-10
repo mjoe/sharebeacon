@@ -61,9 +61,11 @@ final class SMBShareManager: NSObject {
     private let saveKey = "shareBeaconShares"
     private let retryInterval: TimeInterval = 60
     private let reachabilityTimeout: TimeInterval = 120
+    private let wakeGraceInterval: TimeInterval = 5
 
     @ObservationIgnored private var networkMonitor: NWPathMonitor?
     @ObservationIgnored private var retryTask: Task<Void, Never>?
+    @ObservationIgnored private var wakeTask: Task<Void, Never>?
     @ObservationIgnored private var operations: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var adoptedMountPoints: [UUID: String] = [:]
     @ObservationIgnored private var manuallyUnmounted: Set<UUID> = []
@@ -92,6 +94,7 @@ final class SMBShareManager: NSObject {
     deinit {
         networkMonitor?.cancel()
         retryTask?.cancel()
+        wakeTask?.cancel()
         operations.values.forEach { $0.cancel() }
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
@@ -454,6 +457,7 @@ final class SMBShareManager: NSObject {
         guard !isSleeping else { return }
         isSleeping = true
         retryTask?.cancel()
+        wakeTask?.cancel()
         operations.values.forEach { $0.cancel() }
         operations.removeAll()
         appendLog("Mac is sleeping; pausing share monitoring.")
@@ -463,7 +467,14 @@ final class SMBShareManager: NSObject {
         isSleeping = false
         appendLog("Mac woke from sleep; resuming share monitoring.")
         startRetryTask()
-        mountAutoMountingShares()
+        wakeTask?.cancel()
+        wakeTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(self?.wakeGraceInterval ?? 5))
+            guard !Task.isCancelled else { return }
+            guard let self, !self.isSleeping else { return }
+            self.appendLog("Network grace period elapsed; reconnecting shares.")
+            self.mountAutoMountingShares()
+        }
     }
 
     @objc private func volumeDidUnmount() {
