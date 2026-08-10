@@ -38,12 +38,23 @@ swift test
 ./scripts/build-release.sh
 ```
 
-Use `./scripts/build-release.sh --clean` for a clean derived-data build or
-`./scripts/build-release.sh --skip-sign` when only an unsigned local artifact
-is needed. Release ZIPs include a SHA-256 checksum.
+Use `./scripts/build-release.sh --clean` for a clean derived-data build,
+`--skip-sign` when only an unsigned local artifact is needed, and `--notarize`
+to submit the release to Apple notarization and staple the ticket. The
+`--notarize` option requires `NOTARY_KEY_ID`, `NOTARY_ISSUER`, and
+`NOTARY_KEY_PATH`. Release ZIPs include a SHA-256 checksum.
 
-The release build is universal and currently ad-hoc signed. Notarized
-distribution is planned. The application does not require Full Disk Access.
+The release build is universal. When a Developer ID Application certificate is
+installed in the login keychain, `build-release.sh` signs with it (with
+Hardened Runtime) instead of ad-hoc. The application does not require Full Disk
+Access.
+
+Releases are published as GitHub releases on
+[mjoe/sharebeacon](https://github.com/mjoe/sharebeacon) and distributed through
+the [mjoe/homebrew-sharebeacon](https://github.com/mjoe/homebrew-sharebeacon)
+tap. Publish a release with `gh release create` rather than pushing a tag, so
+the CI release job does not overwrite the notarized assets with an unsigned
+build.
 
 ## Security
 
