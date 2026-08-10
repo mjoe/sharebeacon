@@ -19,6 +19,31 @@ sidebar favorites after a share reconnects.
 - Finder sidebar favorite repair with a safe no-op fallback
 - macOS 26 or newer, Apple Silicon and Intel
 
+## Installation
+
+ShareBeacon requires macOS 26 or newer. Releases are signed with a Developer
+ID certificate, notarized by Apple, and distributed through GitHub Releases.
+
+### Homebrew
+
+Install from the ShareBeacon tap:
+
+```bash
+brew install mjoe/sharebeacon/sharebeacon
+```
+
+To update later:
+
+```bash
+brew upgrade sharebeacon
+```
+
+### Manual
+
+Download the latest `ShareBeacon-<version>.zip` and its `.sha256` checksum from
+the [releases page](https://github.com/mjoe/sharebeacon/releases), verify the
+checksum, unzip, and move `ShareBeacon.app` to your Applications folder.
+
 ## Requirements
 
 - macOS Tahoe 26 or newer
