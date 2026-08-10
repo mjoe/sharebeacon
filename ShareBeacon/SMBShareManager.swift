@@ -67,6 +67,7 @@ final class SMBShareManager: NSObject {
     @ObservationIgnored private var operations: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var adoptedMountPoints: [UUID: String] = [:]
     @ObservationIgnored private var manuallyUnmounted: Set<UUID> = []
+    @ObservationIgnored private var isSleeping = false
     @ObservationIgnored private let operationRunner = MountOperationRunner()
 
     init(
@@ -402,13 +403,20 @@ final class SMBShareManager: NSObject {
         monitor.pathUpdateHandler = { [weak self] path in
             guard path.status == .satisfied else { return }
             Task { @MainActor in
-                self?.appendLog("Network path changed; checking configured shares.")
-                self?.mountAutoMountingShares()
+                guard let self, !self.isSleeping else { return }
+                self.appendLog("Network path changed; checking configured shares.")
+                self.mountAutoMountingShares()
             }
         }
         monitor.start(queue: DispatchQueue(label: "com.mjoe.sharebeacon.network"))
         networkMonitor = monitor
 
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(didSleep),
+            name: NSWorkspace.willSleepNotification,
+            object: nil
+        )
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(didWake),
@@ -422,27 +430,44 @@ final class SMBShareManager: NSObject {
             object: nil
         )
 
-        retryTask?.cancel()
-        let retryInterval = self.retryInterval
-        retryTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(retryInterval))
-                guard !Task.isCancelled else { return }
-                self?.mountAutoMountingShares()
-            }
-        }
+        startRetryTask()
 
         Task { @MainActor in
             mountAutoMountingShares()
         }
     }
 
+    private func startRetryTask() {
+        retryTask?.cancel()
+        let retryInterval = self.retryInterval
+        retryTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(retryInterval))
+                guard !Task.isCancelled else { return }
+                guard let self, !self.isSleeping else { continue }
+                self.mountAutoMountingShares()
+            }
+        }
+    }
+
+    @objc private func didSleep() {
+        guard !isSleeping else { return }
+        isSleeping = true
+        retryTask?.cancel()
+        operations.values.forEach { $0.cancel() }
+        operations.removeAll()
+        appendLog("Mac is sleeping; pausing share monitoring.")
+    }
+
     @objc private func didWake() {
-        appendLog("Mac woke from sleep; checking configured shares.")
+        isSleeping = false
+        appendLog("Mac woke from sleep; resuming share monitoring.")
+        startRetryTask()
         mountAutoMountingShares()
     }
 
     @objc private func volumeDidUnmount() {
+        guard !isSleeping else { return }
         refreshMountStates()
         mountAutoMountingShares()
     }

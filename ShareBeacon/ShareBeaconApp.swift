@@ -59,13 +59,15 @@ struct ShareBeaconApp: App {
             }
             .disabled(!hasSharesWaitingToMount)
 
-            SettingsLink {
-                Text("Settings…")
+            Button("Settings…") {
+                NSApp.activate(ignoringOtherApps: true)
+                openSettings()
             }
             .keyboardShortcut(",")
 
             Button("View Log") {
                 selectedSettingsTab = SettingsTab.log.rawValue
+                NSApp.activate(ignoringOtherApps: true)
                 openSettings()
             }
 
