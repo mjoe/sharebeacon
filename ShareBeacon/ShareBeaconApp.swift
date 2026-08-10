@@ -78,6 +78,11 @@ struct ShareBeaconApp: App {
                 NSApplication.shared.orderFrontStandardAboutPanel(nil)
             }
 
+            Button("GitHub Project…") {
+                NSApp.activate(ignoringOtherApps: true)
+                NSWorkspace.shared.open(AppMetadata.projectURL)
+            }
+
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }

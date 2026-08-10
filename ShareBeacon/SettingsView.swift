@@ -165,6 +165,11 @@ struct SettingsView: View {
                 LabeledContent("Version") {
                     Text(AppMetadata.versionLabel)
                 }
+                LabeledContent("Project") {
+                    Link(destination: AppMetadata.projectURL) {
+                        Label("View on GitHub", systemImage: "arrow.up.right.square")
+                    }
+                }
             }
         }
         .formStyle(.grouped)
