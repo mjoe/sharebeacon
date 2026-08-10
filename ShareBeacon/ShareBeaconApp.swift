@@ -74,6 +74,7 @@ struct ShareBeaconApp: App {
             Divider()
 
             Button("About") {
+                NSApp.activate(ignoringOtherApps: true)
                 NSApplication.shared.orderFrontStandardAboutPanel(nil)
             }
 
