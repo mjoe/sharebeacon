@@ -9,8 +9,8 @@
 # Commit message: `sharebeacon <version> (new cask)`
 
 cask "sharebeacon" do
-  version "0.5"
-  sha256 "7e8a76674c6dabc49d25fb223375ad5d008f6cdad30aa0d4b6625ce692f26d91"
+  version "0.6"
+  sha256 "97f757b150e1fa01478cd52f56481bc96c9da9f0efd41435d67a685c657d2e60"
 
   url "https://github.com/mjoe/sharebeacon/releases/download/v#{version}/ShareBeacon-#{version}.zip"
   name "ShareBeacon"
