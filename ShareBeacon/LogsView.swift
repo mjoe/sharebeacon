@@ -33,9 +33,9 @@ struct LogsView: View {
 
             Table(filteredEntries) {
                 TableColumn("Time") { entry in
-                    Text(entry.timestamp.formatted(date: .omitted, time: .standard))
+                    Text(entry.timestamp.formatted(date: .abbreviated, time: .standard))
                 }
-                .width(min: 80, ideal: 95)
+                .width(min: 160, ideal: 195)
 
                 TableColumn("Level") { entry in
                     Text(entry.level.rawValue)
