@@ -52,9 +52,9 @@ checksum, unzip, and move `ShareBeacon.app` to your Applications folder.
 
 ## Versioning
 
-ShareBeacon uses a two-part product version, currently `0.6`.
-Release tags use the same format, for example `v0.6`. Release titles are
-`ShareBeacon <version>` (for example `ShareBeacon 0.6`). Build numbers are
+ShareBeacon uses a two-part product version, currently `0.8`.
+Release tags use the same format, for example `v0.8`. Release titles are
+`ShareBeacon <version>` (for example `ShareBeacon 0.8`). Build numbers are
 separate and increase for each CI build.
 
 ## Build and Test
