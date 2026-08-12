@@ -33,9 +33,9 @@ struct LogsView: View {
 
             Table(filteredEntries) {
                 TableColumn("Time") { entry in
-                    Text(entry.timestamp.formatted(date: .abbreviated, time: .standard))
+                    Text(entry.timestamp, formatter: Self.timestampFormatter)
                 }
-                .width(min: 160, ideal: 195)
+                .width(min: 150, ideal: 170)
 
                 TableColumn("Level") { entry in
                     Text(entry.level.rawValue)
@@ -66,4 +66,12 @@ struct LogsView: View {
         case .error: return 3
         }
     }
+
+    private static let timestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        return formatter
+    }()
 }
