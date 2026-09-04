@@ -14,7 +14,7 @@ sidebar favorites after a share reconnects.
 - Automatic recovery after login, network changes, sleep/wake, and disconnects
 - Sleep-aware: pauses all monitoring and mount activity while the Mac sleeps
 - Credentials kept out of URLs, configuration, process arguments, and logs
-- User-owned or `/Volumes` mount points
+- User-owned mount points by default, without requiring administrator privileges; custom paths such as `/Volumes` are supported
 - Settings window with Shares, General, and Log tabs (live log with level filter)
 - Finder sidebar favorite repair with a safe no-op fallback
 - macOS 26 or newer, Apple Silicon and Intel
