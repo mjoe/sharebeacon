@@ -82,9 +82,8 @@ Access.
 Releases are published as GitHub releases on
 [mjoe/sharebeacon](https://github.com/mjoe/sharebeacon) and distributed through
 the [mjoe/homebrew-sharebeacon](https://github.com/mjoe/homebrew-sharebeacon)
-tap. Publish a release with `gh release create` rather than pushing a tag, so
-the CI release job does not overwrite the notarized assets with an unsigned
-build.
+tap. Build and notarize the release locally, then publish it with
+`gh release create` together with the ZIP and its SHA-256 checksum.
 
 ## Security
 
