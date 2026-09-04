@@ -50,6 +50,10 @@ checksum, unzip, and move `ShareBeacon.app` to your Applications folder.
 - Xcode or Xcode Command Line Tools
 - Access to an SMB server
 
+New shares use a user-owned `~/Volumes/<share-name>` mount point by default, so
+ShareBeacon can create it without elevated privileges. Custom mount points,
+including `/Volumes/<share-name>`, can be selected when needed.
+
 ## Versioning
 
 ShareBeacon uses a two-part product version, currently `0.8`.

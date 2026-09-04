@@ -439,6 +439,9 @@ private struct ShareEditorView: View {
                         }
                     }
                 }
+                Text("New shares use a user-owned folder at ~/Volumes by default. Custom mount points are also supported.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Toggle("Share is active", isOn: $share.isEnabled)
                 Toggle("Mount automatically when available", isOn: $share.autoMount)
 
