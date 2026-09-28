@@ -6,32 +6,32 @@ struct LogsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            GlassEffectContainer(spacing: 12) {
-                HStack(spacing: 12) {
-                    Picker("Level", selection: $minimumLevel) {
-                        Text("All").tag(LogLevel.debug)
-                        Text("Warnings").tag(LogLevel.warning)
-                        Text("Errors").tag(LogLevel.error)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 190)
-                    .help("Show entries at this level or above")
-
-                    Spacer()
-
-                    Button {
-                        NSWorkspace.shared.open(AppLogger.shared.logURL)
-                    } label: {
-                        Label("Open Full Log", systemImage: "doc.text")
-                    }
-                    .help("Open the complete log file in a text editor")
+            HStack(spacing: 12) {
+                Picker("Level", selection: $minimumLevel) {
+                    Text("All").tag(LogLevel.debug)
+                    Text("Warnings").tag(LogLevel.warning)
+                    Text("Errors").tag(LogLevel.error)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 190)
+                .padding(.leading, Self.glassInset)
+                .help("Show entries at this level or above")
+
+                Spacer()
+
+                Button {
+                    NSWorkspace.shared.open(AppLogger.shared.logURL)
+                } label: {
+                    Label("Open Full Log", systemImage: "doc.text")
+                }
+                .buttonStyle(.glass)
+                .help("Open the complete log file in a text editor")
             }
-            .padding(12)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            Divider()
 
             Table(filteredEntries) {
                 TableColumn("Time") { entry in
@@ -59,6 +59,11 @@ struct LogsView: View {
             .filter { Self.severity(of: $0.level) >= Self.severity(of: minimumLevel) }
             .reversed()
     }
+
+    /// A glass button draws its capsule inset from its own layout frame, while
+    /// a segmented control draws its capsule edge on the frame. Matching the
+    /// two here keeps the filter and the button the same distance from the edge.
+    private static let glassInset: CGFloat = 6
 
     private static func severity(of level: LogLevel) -> Int {
         switch level {
