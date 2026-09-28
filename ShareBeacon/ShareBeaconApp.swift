@@ -96,6 +96,7 @@ struct ShareBeaconApp: App {
             SettingsView()
                 .environment(shareManager)
         }
+        .windowResizability(.contentMinSize)
     }
 
     private var hasSharesWaitingToMount: Bool {

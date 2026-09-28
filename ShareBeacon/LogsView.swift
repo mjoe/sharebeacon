@@ -14,8 +14,6 @@ struct LogsView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 190)
-                .padding(.leading, Self.glassInset)
                 .help("Show entries at this level or above")
 
                 Spacer()
@@ -59,11 +57,6 @@ struct LogsView: View {
             .filter { Self.severity(of: $0.level) >= Self.severity(of: minimumLevel) }
             .reversed()
     }
-
-    /// A glass button draws its capsule inset from its own layout frame, while
-    /// a segmented control draws its capsule edge on the frame. Matching the
-    /// two here keeps the filter and the button the same distance from the edge.
-    private static let glassInset: CGFloat = 6
 
     private static func severity(of level: LogLevel) -> Int {
         switch level {
