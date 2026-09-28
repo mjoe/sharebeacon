@@ -44,6 +44,24 @@ jobs:
           version="$(tr -d '[:space:]' < VERSION)"
           test "${GITHUB_REF_NAME}" = "v${version}"
 
+      # 0.10 sorts before 0.9 lexicographically, so a plain string compare would
+      # happily let a release go backwards. Compare numerically instead.
+      - name: Ensure the release is newer than existing tags
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          highest="$(
+            git tag --list 'v*' --sort=v:refname |
+              sed 's/^v//' |
+              sort -V |
+              tail -n 1
+          )"
+          if [ -n "${highest}" ] && [ "$(printf '%s\n%s\n' "${highest}" "${version}" | sort -V | head -n 1)" = "${version}" ]; then
+            printf 'Tag v%s is not newer than the existing v%s\n' "${version}" "${highest}" >&2
+            exit 1
+          fi
+          printf 'v%s is newer than v%s\n' "${version}" "${highest:-none}"
+
       - name: Build universal release
         run: ./scripts/build-release.sh
 
