@@ -216,4 +216,82 @@ struct ShareBeaconCoreTests {
 
         #expect(decoded.sharedCredential == share.sharedCredential)
     }
+
+    // MARK: - Mount point suggestions
+
+    private let volumes = "/Users/tester/Volumes"
+
+    /// The regression: the field is rewritten on every keystroke, so guarding on
+    /// "is it still the default" only allowed the first character through.
+    @Test("mount point suggestion follows every keystroke of the share name")
+    func suggestionFollowsEveryKeystroke() {
+        var current = "~/Volumes"
+        var lastSuggested: String?
+
+        for partial in ["d", "do", "doc", "docs"] {
+            let next = MountPointSuggestion.suggestion(
+                for: partial,
+                current: current,
+                lastSuggested: lastSuggested,
+                defaultDirectory: volumes
+            )
+            #expect(next == "\(volumes)/\(partial)")
+            current = next
+            lastSuggested = next
+        }
+
+        #expect(current == "\(volumes)/docs")
+    }
+
+    @Test("mount point suggestion never overwrites a value the user typed")
+    func suggestionRespectsUserInput() {
+        let typed = "/Volumes/custom-place"
+
+        let next = MountPointSuggestion.suggestion(
+            for: "docs",
+            current: typed,
+            lastSuggested: nil,
+            defaultDirectory: volumes
+        )
+
+        #expect(next == typed)
+    }
+
+    @Test("mount point suggestion resumes after the user clears their own value")
+    func suggestionResumesAfterClearing() {
+        #expect(MountPointSuggestion.isEditedByUser(
+            current: volumes + "/docs",
+            lastSuggested: nil,
+            defaultDirectory: volumes
+        ))
+
+        #expect(MountPointSuggestion.suggestion(
+            for: "docs",
+            current: "~/Volumes",
+            lastSuggested: nil,
+            defaultDirectory: volumes
+        ) == "\(volumes)/docs")
+    }
+
+    @Test("mount point suggestion holds for a blank share name")
+    func suggestionHoldsForBlankName() {
+        for placeholder in ["~/Volumes", volumes, volumes + "/"] {
+            #expect(MountPointSuggestion.suggestion(
+                for: "   ",
+                current: placeholder,
+                lastSuggested: nil,
+                defaultDirectory: volumes
+            ) == placeholder)
+        }
+    }
+
+    @Test("mount point suggestion trims surrounding whitespace from the share name")
+    func suggestionTrimsWhitespace() {
+        #expect(MountPointSuggestion.suggestion(
+            for: "  docs  ",
+            current: "~/Volumes",
+            lastSuggested: nil,
+            defaultDirectory: volumes
+        ) == "\(volumes)/docs")
+    }
 }

@@ -571,22 +571,14 @@ private struct ShareEditorView: View {
         availableCredentials = availableSharedCredentials(share.host)
     }
 
-    /// True once the mount point diverges from our last suggestion, which means
-    /// the user has taken ownership of the field.
-    private var mountPointEditedManually: Bool {
-        if let lastSuggestedMountPoint {
-            return share.mountPoint != lastSuggestedMountPoint
-        }
-        return share.mountPoint != "~/Volumes"
-            && share.mountPoint != defaultMountPoint
-            && !share.mountPoint.isEmpty
-    }
-
     private func suggestMountPointIfDefault(named shareName: String) {
-        let trimmed = shareName.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        guard !mountPointEditedManually else { return }
-        let suggestion = "\(defaultMountPoint)/\(trimmed)"
+        let suggestion = MountPointSuggestion.suggestion(
+            for: shareName,
+            current: share.mountPoint,
+            lastSuggested: lastSuggestedMountPoint,
+            defaultDirectory: defaultMountPoint
+        )
+        guard suggestion != share.mountPoint else { return }
         lastSuggestedMountPoint = suggestion
         share.mountPoint = suggestion
     }

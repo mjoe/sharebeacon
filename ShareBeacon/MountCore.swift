@@ -178,6 +178,43 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
     }
 }
 
+/// Keeps the suggested mount point in step with the share name while the user
+/// is still typing, without ever overwriting a value they entered themselves.
+///
+/// Extracted from the share editor so the behaviour is testable. The previous
+/// version compared the field against the default, which only held for the
+/// first character typed and therefore dropped the rest of the name.
+enum MountPointSuggestion {
+    /// Returns the suggestion for `shareName`, or `current` when the user owns
+    /// the field and it must not be replaced.
+    static func suggestion(
+        for shareName: String,
+        current: String,
+        lastSuggested: String?,
+        defaultDirectory: String
+    ) -> String {
+        guard !isEditedByUser(current: current, lastSuggested: lastSuggested, defaultDirectory: defaultDirectory) else {
+            return current
+        }
+        let trimmed = shareName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return current }
+        return defaultDirectory + "/" + trimmed
+    }
+
+    /// True when `current` is not a value we produced, meaning the user typed or
+    /// chose it. A nil `lastSuggested` means no suggestion is in flight, so only
+    /// untouched defaults are treated as unowned.
+    static func isEditedByUser(current: String, lastSuggested: String?, defaultDirectory: String) -> Bool {
+        if let lastSuggested {
+            return current != lastSuggested
+        }
+        return current != "~/Volumes"
+            && current != defaultDirectory
+            && current != defaultDirectory + "/"
+            && !current.isEmpty
+    }
+}
+
 struct MountTable: Sendable {
     private struct Entry: Sendable {
         let source: String
