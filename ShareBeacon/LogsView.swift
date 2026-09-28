@@ -6,30 +6,32 @@ struct LogsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Picker("Level", selection: $minimumLevel) {
-                    Text("All").tag(LogLevel.debug)
-                    Text("Warnings").tag(LogLevel.warning)
-                    Text("Errors").tag(LogLevel.error)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 190)
-                .help("Show entries at this level or above")
+            GlassEffectContainer(spacing: 12) {
+                HStack(spacing: 12) {
+                    Picker("Level", selection: $minimumLevel) {
+                        Text("All").tag(LogLevel.debug)
+                        Text("Warnings").tag(LogLevel.warning)
+                        Text("Errors").tag(LogLevel.error)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 190)
+                    .help("Show entries at this level or above")
 
-                Spacer()
+                    Spacer()
 
-                Button {
-                    NSWorkspace.shared.open(AppLogger.shared.logURL)
-                } label: {
-                    Label("Open Full Log", systemImage: "doc.text")
+                    Button {
+                        NSWorkspace.shared.open(AppLogger.shared.logURL)
+                    } label: {
+                        Label("Open Full Log", systemImage: "doc.text")
+                    }
+                    .help("Open the complete log file in a text editor")
                 }
-                .help("Open the complete log file in a text editor")
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .glassEffect(.regular, in: .rect(cornerRadius: 12))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            Divider()
+            .padding(12)
 
             Table(filteredEntries) {
                 TableColumn("Time") { entry in

@@ -19,18 +19,18 @@ struct SettingsView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            sharesTab
-                .tabItem { Label("Shares", systemImage: "externaldrive") }
-                .tag(SettingsTab.shares.rawValue)
+            Tab("Shares", systemImage: "externaldrive", value: SettingsTab.shares.rawValue) {
+                sharesTab
+            }
 
-            LogsView()
-                .environment(AppLogger.shared)
-                .tabItem { Label("Log", systemImage: "doc.text") }
-                .tag(SettingsTab.log.rawValue)
+            Tab("Log", systemImage: "doc.text", value: SettingsTab.log.rawValue) {
+                LogsView()
+                    .environment(AppLogger.shared)
+            }
 
-            generalTab
-                .tabItem { Label("General", systemImage: "gearshape") }
-                .tag(SettingsTab.general.rawValue)
+            Tab("General", systemImage: "gearshape", value: SettingsTab.general.rawValue) {
+                generalTab
+            }
         }
         .tabViewStyle(.tabBarOnly)
         .frame(minWidth: 640, minHeight: 520)
@@ -47,6 +47,7 @@ struct SettingsView: View {
                     Button("Add Share") {
                         isAddingShare = true
                     }
+                    .buttonStyle(.glassProminent)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -83,8 +84,7 @@ struct SettingsView: View {
                         } label: {
                             Label("Add Share", systemImage: "plus")
                         }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.tint)
+                        .buttonStyle(.glass)
                     } footer: {
                         Text("Mounts begin only after the configured SMB endpoint is reachable.")
                     }
@@ -265,24 +265,29 @@ private struct ShareSettingsRow: View {
 
             Spacer()
 
-            primaryActionButton
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    primaryActionButton
 
-            Menu {
-                Toggle("Share is active", isOn: enabledBinding)
-                Toggle("Mount automatically", isOn: autoMountBinding)
-                Divider()
-                Button("Open in Finder", action: open)
-                    .disabled(state != .mounted)
-                Button("Add to Finder Favorites", action: favorite)
-                    .disabled(state != .mounted)
-                Divider()
-                Button("Edit…", action: edit)
-                Button("Remove…", role: .destructive, action: remove)
-            } label: {
-                Image(systemName: "ellipsis")
+                    Menu {
+                        Toggle("Share is active", isOn: enabledBinding)
+                        Toggle("Mount automatically", isOn: autoMountBinding)
+                        Divider()
+                        Button("Open in Finder", action: open)
+                            .disabled(state != .mounted)
+                        Button("Add to Finder Favorites", action: favorite)
+                            .disabled(state != .mounted)
+                        Divider()
+                        Button("Edit…", action: edit)
+                        Button("Remove…", role: .destructive, action: remove)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                    }
+                    .menuStyle(.borderlessButton)
+                    .controlSize(.small)
+                    .help("More actions")
+                }
             }
-            .menuStyle(.borderlessButton)
-            .help("More actions")
         }
         .padding(.vertical, 6)
         .help("Double-click to edit")
@@ -293,11 +298,11 @@ private struct ShareSettingsRow: View {
         switch state {
         case .mounted:
             Button("Unmount", action: unmount)
-                .buttonStyle(.bordered)
+                .buttonStyle(.glass)
                 .controlSize(.small)
         case .disabled:
             Button("Mount", action: mount)
-                .buttonStyle(.bordered)
+                .buttonStyle(.glass)
                 .controlSize(.small)
                 .disabled(true)
         case .waitingForNetwork, .mounting, .unmounting:
@@ -306,7 +311,7 @@ private struct ShareSettingsRow: View {
                 .frame(width: 64)
         case .unmounted, .failed:
             Button("Mount", action: mount)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.glassProminent)
                 .controlSize(.small)
         }
     }
@@ -428,6 +433,7 @@ private struct ShareEditorView: View {
                         }
                         .font(.caption)
                         .controlSize(.small)
+                        .buttonStyle(.glass)
                     }
                 }
                 LabeledContent("Mount point") {
@@ -437,6 +443,7 @@ private struct ShareEditorView: View {
                         Button("Browse…") {
                             chooseMountPoint()
                         }
+                        .buttonStyle(.glass)
                     }
                 }
                 Text("New shares use a user-owned folder at ~/Volumes by default. Custom mount points are also supported.")
@@ -456,34 +463,37 @@ private struct ShareEditorView: View {
             }
             .formStyle(.grouped)
 
-            Divider()
-
-            HStack {
-                Button("Cancel") {
-                    dismiss()
-                }
-                .keyboardShortcut(.cancelAction)
-
-                Spacer()
-
-                Button("Save") {
-                    do {
-                        try onSave(share, password.isEmpty ? nil : password)
+            GlassEffectContainer(spacing: 12) {
+                HStack {
+                    Button("Cancel") {
                         dismiss()
-                    } catch {
-                        errorMessage = error.localizedDescription
                     }
+                    .keyboardShortcut(.cancelAction)
+
+                    Spacer()
+
+                    Button("Save") {
+                        do {
+                            try onSave(share, password.isEmpty ? nil : password)
+                            dismiss()
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(
+                        share.name.trimmingCharacters(in: .whitespaces).isEmpty ||
+                        share.host.trimmingCharacters(in: .whitespaces).isEmpty ||
+                        share.shareName.trimmingCharacters(in: .whitespaces).isEmpty ||
+                        share.mountPoint.trimmingCharacters(in: .whitespaces).isEmpty
+                    )
                 }
-                .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
-                .disabled(
-                    share.name.trimmingCharacters(in: .whitespaces).isEmpty ||
-                    share.host.trimmingCharacters(in: .whitespaces).isEmpty ||
-                    share.shareName.trimmingCharacters(in: .whitespaces).isEmpty ||
-                    share.mountPoint.trimmingCharacters(in: .whitespaces).isEmpty
-                )
+                .padding(12)
+                .glassEffect(.regular, in: .rect(cornerRadius: 12))
             }
-            .padding()
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
         }
         .frame(width: 560, height: 560)
         .onAppear {
