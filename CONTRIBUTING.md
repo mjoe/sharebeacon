@@ -22,7 +22,8 @@ Security requirements:
 - Keep credentials in macOS Keychain and pass them to NetFS only in memory.
 - Do not add telemetry or external network calls without explicit documentation.
 - Pin GitHub Actions and source dependencies to immutable revisions.
-- Support macOS 26 and newer only.
+- Support macOS 26 and newer only, including macOS 27. Do not raise the
+  deployment target above macOS 26.0.
 
 Use short conventional commit subjects such as:
 

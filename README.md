@@ -1,9 +1,10 @@
 # ShareBeacon
 
-ShareBeacon is a macOS Tahoe (26) menu-bar application that keeps SMB shares
-available over LANs, Tailscale, WireGuard, OpenVPN, and other routed networks.
-It stores credentials in the login Keychain and is designed to restore Finder
-sidebar favorites after a share reconnects.
+ShareBeacon is a macOS menu-bar application for macOS 26 (Tahoe) and newer,
+including macOS 27, that keeps SMB shares available over LANs, Tailscale,
+WireGuard, OpenVPN, and other routed networks. It stores credentials in the login
+Keychain and is designed to restore Finder sidebar favorites after a share
+reconnects.
 
 ## Features
 
@@ -17,6 +18,7 @@ sidebar favorites after a share reconnects.
 - User-owned mount points by default, without requiring administrator privileges; custom paths such as `/Volumes` are supported
 - Settings window with Shares, General, and Log tabs (live log with level filter)
 - Finder sidebar favorite repair with a safe no-op fallback
+- Liquid Glass controls via the macOS 26 and 27 design system
 - macOS 26 or newer, Apple Silicon and Intel
 
 ## Installation
@@ -46,8 +48,8 @@ checksum, unzip, and move `ShareBeacon.app` to your Applications folder.
 
 ## Requirements
 
-- macOS Tahoe 26 or newer
-- Xcode or Xcode Command Line Tools
+- macOS Tahoe 26 (including macOS 27) or newer
+- Xcode 26 or newer, or Xcode Command Line Tools
 - Access to an SMB server
 
 New shares use a user-owned `~/Volumes/<share-name>` mount point by default, so

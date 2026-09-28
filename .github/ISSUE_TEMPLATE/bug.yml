@@ -48,7 +48,7 @@ body:
     id: os
     attributes:
       label: Operating System
-      description: e.g. macOS 26.0 or macOS 26.6.
+      description: e.g. macOS 26.6 or macOS 27.0.
     validations:
       required: true
   - type: textarea

@@ -10,8 +10,31 @@ permissions:
   contents: read
 
 jobs:
-  test-and-build:
-    runs-on: macos-26
+  test:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS 26 / Xcode 26
+            runner: macos-26
+          - name: macOS 27 / Xcode 27
+            runner: xcode-27
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Unit tests
+        run: swift test
+
+      - name: Build app
+        run: |
+          xcodebuild -project ShareBeacon.xcodeproj -scheme ShareBeacon -configuration Debug build
+
+  release:
+    name: Release bundle
+    needs: test
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
@@ -20,9 +43,6 @@ jobs:
         run: |
           version="$(tr -d '[:space:]' < VERSION)"
           test "${GITHUB_REF_NAME}" = "v${version}"
-
-      - name: Unit tests
-        run: swift test
 
       - name: Build universal release
         run: ./scripts/build-release.sh
