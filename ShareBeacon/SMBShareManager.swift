@@ -272,7 +272,7 @@ final class SMBShareManager: NSObject {
                         reachable = true
                         break
                     }
-                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                    try? await Task.sleep(for: .seconds(5))
                 }
 
                 guard !Task.isCancelled else { return }

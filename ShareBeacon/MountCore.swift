@@ -3,6 +3,7 @@ import Darwin
 import Network
 import Security
 import NetFS
+import Synchronization
 
 enum ShareBeaconError: LocalizedError, Equatable {
     case invalidConfiguration(String)
@@ -273,17 +274,13 @@ struct MountTable: Sendable {
             .map { normalizedMountPoint($0.mountPoint) }
     }
 
-    nonisolated(unsafe) private static var resolutionCache: [String: [String]] = [:]
-    private static let resolutionLock = NSLock()
+    private static let resolutionCache = Mutex<[String: [String]]>([:])
 
     private static func resolvedAddresses(for host: String) -> [String] {
         let key = host.lowercased()
-        resolutionLock.lock()
-        if let cached = resolutionCache[key] {
-            resolutionLock.unlock()
+        if let cached = resolutionCache.withLock({ $0[key] }) {
             return cached
         }
-        resolutionLock.unlock()
 
         var addresses: [String] = []
         var hints = addrinfo()
@@ -292,9 +289,7 @@ struct MountTable: Sendable {
 
         var result: UnsafeMutablePointer<addrinfo>?
         guard getaddrinfo(host, nil, &hints, &result) == 0 else {
-            resolutionLock.lock()
-            resolutionCache[key] = []
-            resolutionLock.unlock()
+            resolutionCache.withLock { $0[key] = [] }
             return []
         }
         defer { freeaddrinfo(result) }
@@ -337,9 +332,7 @@ struct MountTable: Sendable {
             cursor = current.pointee.ai_next
         }
 
-        resolutionLock.lock()
-        resolutionCache[key] = addresses
-        resolutionLock.unlock()
+        resolutionCache.withLock { $0[key] = addresses }
         return addresses
     }
 
@@ -455,7 +448,7 @@ final class KeychainCredentialStore: CredentialStoring, @unchecked Sendable {
     }
 
     func sharedCredentials(forHost host: String) -> [SharedCredential] {
-        var lookup: [String: Any] = [
+        let lookup: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecReturnAttributes as String: true,
@@ -495,7 +488,7 @@ final class KeychainCredentialStore: CredentialStoring, @unchecked Sendable {
     }
 
     private func read(account: String) throws -> String? {
-        var lookup: [String: Any] = [
+        let lookup: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
@@ -556,29 +549,26 @@ struct SMBEndpointChecker: EndpointChecking {
 }
 
 private final class EndpointCheckCompletion: @unchecked Sendable {
-    private let lock = NSLock()
+    private let continuation = Mutex<CheckedContinuation<Bool, Never>?>(nil)
     private let connection: NWConnection
-    private var continuation: CheckedContinuation<Bool, Never>?
 
     init(
         connection: NWConnection,
         continuation: CheckedContinuation<Bool, Never>
     ) {
         self.connection = connection
-        self.continuation = continuation
+        self.continuation.withLock { $0 = continuation }
     }
 
     func finish(_ result: Bool) {
-        lock.lock()
-        guard let continuation else {
-            lock.unlock()
-            return
+        let resume: CheckedContinuation<Bool, Never>? = continuation.withLock { stored in
+            defer { stored = nil }
+            return stored
         }
-        self.continuation = nil
-        lock.unlock()
+        guard let resume else { return }
 
         connection.cancel()
-        continuation.resume(returning: result)
+        resume.resume(returning: result)
     }
 }
 

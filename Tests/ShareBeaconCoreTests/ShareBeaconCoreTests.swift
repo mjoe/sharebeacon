@@ -73,6 +73,28 @@ struct ShareBeaconCoreTests {
         #expect(table.mountPoint(host: "192.168.8.11", share: "docs") == "/Volumes/docs")
     }
 
+    @Test("mount table matches a host against its resolved address")
+    func mountTableMatchesHostAgainstResolvedAddress() {
+        let output = """
+        //mjoe@127.0.0.1/docs on /Volumes/docs (smbfs, nodev, nosuid, mounted by mjoe)
+        """
+        let table = MountTable(output: output)
+
+        #expect(table.mountPoint(host: "localhost", share: "docs") == "/Volumes/docs")
+    }
+
+    @Test("mount table matches repeated lookups for the same host")
+    func mountTableMatchesRepeatedLookupsForSameHost() {
+        let output = """
+        //mjoe@nas.example.test/data on /Volumes/data (smbfs, nodev, nosuid, mounted by mjoe)
+        """
+        let table = MountTable(output: output)
+
+        for _ in 0..<3 {
+            #expect(table.mountPoint(host: "NAS.example.test", share: "data") == "/Volumes/data")
+        }
+    }
+
     @Test("SMB URL contains no credential material")
     func smbURLContainsNoCredentialMaterial() throws {
         let share = ShareConfiguration(

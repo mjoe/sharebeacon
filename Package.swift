@@ -1,4 +1,4 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.3
 import PackageDescription
 
 let package = Package(
@@ -19,6 +19,7 @@ let package = Package(
                 "Logger.swift",
                 "Preview Content",
                 "SettingsView.swift",
+                "LogsView.swift",
                 "SMBShareManager.swift",
                 "sharebeacon.entitlements",
                 "ShareBeaconApp.swift"
