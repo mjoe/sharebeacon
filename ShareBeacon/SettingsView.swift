@@ -345,6 +345,12 @@ private struct ShareEditorView: View {
             .appendingPathComponent("Volumes")
             .path
 
+    /// The mount point we suggested most recently. A change that does not match
+    /// it means the user typed their own value. Comparing values rather than
+    /// using a flag is required because `onChange` fires asynchronously, after
+    /// any synchronous guard around the assignment has already been reset.
+    @State private var lastSuggestedMountPoint: String?
+
     init(
         share: ShareConfiguration,
         availableSharedCredentials: @escaping (String) -> [SharedCredential],
@@ -440,6 +446,14 @@ private struct ShareEditorView: View {
                     HStack(spacing: 8) {
                         TextField("", text: $share.mountPoint)
                             .labelsHidden()
+                            .onChange(of: share.mountPoint) { _, newValue in
+                                // A value we did not suggest means the user typed
+                                // their own; drop the suggestion so we stop
+                                // overwriting it.
+                                if newValue != lastSuggestedMountPoint {
+                                    lastSuggestedMountPoint = nil
+                                }
+                            }
                         Button("Browse…") {
                             chooseMountPoint()
                         }
@@ -557,13 +571,24 @@ private struct ShareEditorView: View {
         availableCredentials = availableSharedCredentials(share.host)
     }
 
+    /// True once the mount point diverges from our last suggestion, which means
+    /// the user has taken ownership of the field.
+    private var mountPointEditedManually: Bool {
+        if let lastSuggestedMountPoint {
+            return share.mountPoint != lastSuggestedMountPoint
+        }
+        return share.mountPoint != "~/Volumes"
+            && share.mountPoint != defaultMountPoint
+            && !share.mountPoint.isEmpty
+    }
+
     private func suggestMountPointIfDefault(named shareName: String) {
         let trimmed = shareName.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
-        guard share.mountPoint == defaultMountPoint || share.mountPoint == "~/Volumes" else {
-            return
-        }
-        share.mountPoint = "\(defaultMountPoint)/\(trimmed)"
+        guard !mountPointEditedManually else { return }
+        let suggestion = "\(defaultMountPoint)/\(trimmed)"
+        lastSuggestedMountPoint = suggestion
+        share.mountPoint = suggestion
     }
 
     private func chooseMountPoint() {
@@ -574,6 +599,7 @@ private struct ShareEditorView: View {
         panel.canCreateDirectories = true
         panel.prompt = "Choose"
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        lastSuggestedMountPoint = nil
         share.mountPoint = url.path
     }
 }
