@@ -45,13 +45,17 @@ jobs:
           test "${GITHUB_REF_NAME}" = "v${version}"
 
       # 0.10 sorts before 0.9 lexicographically, so a plain string compare would
-      # happily let a release go backwards. Compare numerically instead.
+      # happily let a release go backwards. Compare numerically instead. The
+      # runner checks out the tag it is building, so that tag has to be excluded
+      # or the new release would always tie with itself and refuse.
       - name: Ensure the release is newer than existing tags
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           version="$(tr -d '[:space:]' < VERSION)"
+          current="${GITHUB_REF_NAME}"
           highest="$(
-            git tag --list 'v*' --sort=v:refname |
+            git tag --list 'v*' |
+              { grep -v -x -F "${current}" || true; } |
               sed 's/^v//' |
               sort -V |
               tail -n 1
