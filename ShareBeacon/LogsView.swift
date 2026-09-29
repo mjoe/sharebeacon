@@ -45,11 +45,10 @@ struct LogsView: View {
                 TableColumn("Message") { entry in
                     Text(entry.message)
                 }
-                .width(min: 220, ideal: 460)
+                .width(min: 220, ideal: 460, max: .infinity)
             }
             .scrollContentBackground(.hidden)
         }
-        .frame(minWidth: 560, minHeight: 440)
     }
 
     private var filteredEntries: [AppLogEntry] {

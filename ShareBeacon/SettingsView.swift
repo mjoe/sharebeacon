@@ -173,7 +173,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(minWidth: 640, minHeight: 440)
     }
 
     private var launchAtLoginBinding: Binding<Bool> {
