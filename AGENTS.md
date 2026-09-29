@@ -12,7 +12,16 @@ and restoring Finder sidebar favorites after reconnects.
   `GlassButtonStyle(_:)`) with `#available` or `#if compiler`.
 - The package manifest uses `swift-tools-version: 6.3`, which is the lowest
   version that pairs with a macOS 27 capable toolchain while still building on
-  the `macos-26` CI runner.
+  the `macos-26` CI runner. CI tests both runners, `macos-26` and `xcode-27`.
+- CI must never publish a GitHub Release. The `release` job in the workflow only
+  validates the version and uploads an artifact. Releases are built, signed and
+  notarized locally and published with `gh release create`, because a CI bundle
+  is not notarized and would replace the released assets.
+- Keep every version reference in step with `VERSION`: the Xcode
+  `MARKETING_VERSION` in both build configurations, the README, the
+  `softwareVersion` in `docs/index.html`, and `art/sharebeacon-cask.rb`.
+- `art/sharebeacon-cask.rb` and the tap cask must carry the checksum of the
+  build that was actually published, not of an earlier or CI build.
 - Preserve the MIT license and credit Ben Tindall and Valentine Ubani Mayaki.
 - Never store passwords in configuration, URLs, process arguments, or logs.
 - Prefer small, isolated changes with focused tests.
