@@ -57,6 +57,8 @@ struct SettingsView: View {
                             share: share,
                             state: manager.state(for: share),
                             hasPassword: manager.passwordExists(for: share),
+                            link: manager.link(for: share),
+                            isOnUnexpectedLink: manager.isOnUnexpectedLink(share),
                             mount: { manager.mount(share, explicit: true) },
                             unmount: { manager.unmount(share) },
                             open: { manager.openInFinder(share) },
@@ -215,6 +217,8 @@ private struct ShareSettingsRow: View {
     let share: ShareConfiguration
     let state: ShareRuntimeState
     let hasPassword: Bool
+    let link: NetworkLink?
+    let isOnUnexpectedLink: Bool
     let mount: () -> Void
     let unmount: () -> Void
     let open: () -> Void
@@ -271,6 +275,16 @@ private struct ShareSettingsRow: View {
                 Text(share.normalizedMountPoint)
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
+                if let link {
+                    Label(
+                        isOnUnexpectedLink
+                            ? "Via \(link.label) (\(link.interfaceName)), expected a wired link"
+                            : "Via \(link.label) (\(link.interfaceName))",
+                        systemImage: isOnUnexpectedLink ? "wifi.exclamationmark" : link.symbolName
+                    )
+                    .font(.caption)
+                    .foregroundStyle(isOnUnexpectedLink ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                }
                 if case .failed(let message) = state {
                     Text(message)
                         .font(.caption)
@@ -487,6 +501,11 @@ private struct ShareEditorView: View {
                     Text("Never").tag(FinderFavoritePreference.never)
                 }
                 .help("Whether ShareBeacon puts this share back into the Finder favorites after a mount")
+                Picker("Expected link", selection: $share.linkExpectation) {
+                    Text("Any").tag(LinkExpectation.any)
+                    Text("Wired").tag(LinkExpectation.wired)
+                }
+                .help("A share that expects a wired link is flagged when macOS routes it over Wi-Fi or another interface")
 
                 if let errorMessage {
                     Text(errorMessage)
