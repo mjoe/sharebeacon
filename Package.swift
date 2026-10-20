@@ -24,7 +24,7 @@ let package = Package(
                 "sharebeacon.entitlements",
                 "ShareBeaconApp.swift"
             ],
-            sources: ["MountCore.swift"]
+            sources: ["MountCore.swift", "NetworkLink.swift", "ShareStatus.swift"]
         ),
         .testTarget(
             name: "ShareBeaconCoreTests",

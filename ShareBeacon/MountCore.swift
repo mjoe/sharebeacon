@@ -68,6 +68,7 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
     var isEnabled: Bool
     var autoMount: Bool
     var favoritePreference: FinderFavoritePreference
+    var linkExpectation: LinkExpectation
     var sharedCredential: SharedCredential?
 
     init(
@@ -80,6 +81,7 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
         isEnabled: Bool,
         autoMount: Bool = true,
         favoritePreference: FinderFavoritePreference = .followGeneral,
+        linkExpectation: LinkExpectation = .any,
         sharedCredential: SharedCredential? = nil
     ) {
         self.id = id
@@ -91,12 +93,14 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
         self.isEnabled = isEnabled
         self.autoMount = autoMount
         self.favoritePreference = favoritePreference
+        self.linkExpectation = linkExpectation
         self.sharedCredential = sharedCredential
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, host, shareName, username, mountPoint, isEnabled, autoMount
         case favoritePreference
+        case linkExpectation
         case sharedCredential
     }
 
@@ -114,6 +118,10 @@ struct ShareConfiguration: Codable, Identifiable, Equatable, Sendable {
             FinderFavoritePreference.self,
             forKey: .favoritePreference
         ) ?? .followGeneral
+        linkExpectation = try container.decodeIfPresent(
+            LinkExpectation.self,
+            forKey: .linkExpectation
+        ) ?? .any
         sharedCredential = try container.decodeIfPresent(
             SharedCredential.self,
             forKey: .sharedCredential
