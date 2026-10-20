@@ -506,7 +506,7 @@ private struct UsageGauge: View {
     let usage: VolumeUsage
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule().fill(.quaternary)
@@ -516,15 +516,18 @@ private struct UsageGauge: View {
                 }
             }
             .frame(width: 44, height: 5)
-            (
-                Text(usage.shortFree)
-                    .foregroundStyle(usage.usedFraction > 0.98 ? AnyShapeStyle(tint) : AnyShapeStyle(.secondary))
-                + Text(" of \(usage.shortTotal)")
-                    .foregroundStyle(.tertiary)
-            )
-            .font(.caption2.monospacedDigit())
-            .frame(minWidth: 58, alignment: .trailing)
+            .padding(.trailing, 2)
+            // Fixed columns keep free and total figures aligned from row to row.
+            Text(usage.shortFree)
+                .foregroundStyle(usage.usedFraction > 0.98 ? AnyShapeStyle(tint) : AnyShapeStyle(.secondary))
+                .frame(width: 36, alignment: .trailing)
+            Text("of")
+                .foregroundStyle(.tertiary)
+            Text(usage.shortTotal)
+                .foregroundStyle(.tertiary)
+                .frame(width: 30, alignment: .leading)
         }
+        .font(.caption2.monospacedDigit())
         .help(usage.detail)
     }
 
