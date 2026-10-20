@@ -258,14 +258,14 @@ private struct HostHeader: View {
                         .foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(collapsed ? 0 : 90))
                     Image(systemName: "server.rack")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundStyle(.secondary)
                     Text(host)
-                        .font(.caption.weight(.semibold))
+                        .font(.callout.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                     Text("\(mounted)/\(total)")
-                        .font(.caption2.monospacedDigit())
+                        .font(.callout.monospacedDigit())
                         .foregroundStyle(.tertiary)
                     Spacer(minLength: 4)
                 }
@@ -281,13 +281,13 @@ private struct HostHeader: View {
             } else {
                 if let label = traffic?.label {
                     Text(label)
-                        .font(.caption2.monospacedDigit())
+                        .font(.callout.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 if let latency {
                     Text(Self.milliseconds(latency))
-                        .font(.caption2.monospacedDigit())
+                        .font(.callout.monospacedDigit())
                         .foregroundStyle(.tertiary)
                         .help("Time to open a connection to \(host):445")
                 }
@@ -322,7 +322,7 @@ private struct LinkBadge: View {
                     .monospacedDigit()
             }
         }
-        .font(.caption2.weight(.semibold))
+        .font(.callout.weight(.semibold))
         .foregroundStyle(tint)
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
@@ -361,7 +361,7 @@ private struct ShareMenuRow: View {
                     .foregroundStyle(share.isEnabled ? .primary : .secondary)
                 if let detail {
                     Text(detail)
-                        .font(.caption2)
+                        .font(.callout)
                         .foregroundStyle(detailColor)
                         .lineLimit(1)
                 }
@@ -374,7 +374,7 @@ private struct ShareMenuRow: View {
                     manager.remount(share)
                 } label: {
                     Label("Cable", systemImage: "cable.connector")
-                        .font(.caption2.weight(.semibold))
+                        .font(.callout.weight(.semibold))
                 }
                 .buttonStyle(.glass)
                 .controlSize(.mini)
@@ -520,14 +520,16 @@ private struct UsageGauge: View {
             // Fixed columns keep free and total figures aligned from row to row.
             Text(usage.shortFree)
                 .foregroundStyle(usage.usedFraction > 0.98 ? AnyShapeStyle(tint) : AnyShapeStyle(.secondary))
-                .frame(width: 36, alignment: .trailing)
+                .frame(width: 48, alignment: .trailing)
             Text("of")
                 .foregroundStyle(.tertiary)
             Text(usage.shortTotal)
                 .foregroundStyle(.tertiary)
-                .frame(width: 30, alignment: .leading)
+                .frame(width: 40, alignment: .leading)
         }
-        .font(.caption2.monospacedDigit())
+        .font(.callout.monospacedDigit())
+        .lineLimit(1)
+        .fixedSize()
         .help(usage.detail)
     }
 
