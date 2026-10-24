@@ -295,10 +295,7 @@ private struct LinkBadge: View {
     var body: some View {
         HStack(spacing: 3) {
             Image(systemName: link.symbolName)
-            if let speed = link.shortSpeed {
-                Text(speed)
-                    .monospacedDigit()
-            }
+            Text(title)
         }
         .font(.callout.weight(.semibold))
         .foregroundStyle(tint)
@@ -308,7 +305,34 @@ private struct LinkBadge: View {
         .help("\(link.label) (\(link.interfaceName))")
     }
 
+    /// The badge names the path, not its rate. The rate of a good link says
+    /// nothing about what SMB delivers, and a Wi-Fi rate changes with the
+    /// radio. A wired link below a gigabit is the one speed worth showing,
+    /// because it explains a slow transfer.
+    private var title: String {
+        switch link.kind {
+        case .wired:
+            if isSlowWired, let speed = NetworkLink.speedLabel(link.bitsPerSecond) {
+                return "Ethernet \(speed)"
+            }
+            return "Ethernet"
+        case .wifi:
+            return "Wi-Fi"
+        case .tunnel:
+            return "VPN"
+        case .other:
+            return link.interfaceName
+        }
+    }
+
+    private var isSlowWired: Bool {
+        link.kind == .wired && link.bitsPerSecond > 0 && link.bitsPerSecond < 1_000_000_000
+    }
+
     private var tint: Color {
+        if isSlowWired {
+            return .orange
+        }
         switch link.kind {
         case .wired: return .green
         case .wifi: return .blue
