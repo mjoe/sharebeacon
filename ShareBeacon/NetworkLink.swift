@@ -120,9 +120,72 @@ struct SystemNetworkLinkResolver: NetworkLinkResolving {
             interfaceName: interfaceName,
             systemType: systemInterfaceTypes()[interfaceName]
         )
-        // Wi-Fi reports no fixed baud rate, so the current transmit rate stands in.
-        let bitsPerSecond = kind == .wifi ? wifiTransmitRate(interfaceName: interfaceName) : baudRate
+        let bitsPerSecond: UInt64
+        if kind == .wifi {
+            // Wi-Fi reports no fixed baud rate, so the current transmit rate stands in.
+            bitsPerSecond = wifiTransmitRate(interfaceName: interfaceName)
+        } else {
+            bitsPerSecond = mediaSpeed(interfaceName: interfaceName)
+                ?? usableBaudRate(baudRate)
+        }
         return NetworkLink(interfaceName: interfaceName, kind: kind, bitsPerSecond: bitsPerSecond)
+    }
+
+    /// The negotiated speed of an interface.
+    ///
+    /// `ifi_baudrate` is 0xFFFFFFFF on an interface whose speed macOS does not
+    /// expose, which a 10Gbase-T port does. Dividing that value by a billion
+    /// made a 10 Gb link read as "4.3G", so the media word is asked instead.
+    private static func mediaSpeed(interfaceName: String) -> UInt64? {
+        let descriptor = socket(AF_INET, SOCK_DGRAM, 0)
+        guard descriptor >= 0 else { return nil }
+        defer { close(descriptor) }
+
+        var request = ifmediareq()
+        withUnsafeMutablePointer(to: &request.ifm_name) { name in
+            name.withMemoryRebound(to: CChar.self, capacity: Int(IFNAMSIZ)) { buffer in
+                _ = strlcpy(buffer, interfaceName, Int(IFNAMSIZ))
+            }
+        }
+        // SIOCGIFMEDIA is not imported because its macro spelling embeds a
+        // structure; 3224135992 is `_IOWR('i', 56, struct ifmediareq)`.
+        guard ioctl(descriptor, 3_224_135_992, &request) == 0,
+              request.ifm_status & IFM_AVALID != 0
+        else { return nil }
+
+        // IFM_TMASK from net/if_media.h.
+        return speed(forMediaSubtype: request.ifm_active & 0x000f_001f)
+    }
+
+    /// A baud rate of 0xFFFFFFFF means "not reported", not 4.3 Gb/s.
+    static func usableBaudRate(_ value: UInt64) -> UInt64 {
+        value == UInt64(UInt32.max) ? 0 : value
+    }
+
+    /// Maps a media subtype from net/if_media.h to bits per second.
+    static func speed(forMediaSubtype subtype: Int32) -> UInt64? {
+        let megabits: UInt64
+        switch subtype {
+        case 3, 4, 5, 12, 13:
+            megabits = 10
+        case 6, 7, 8, 9, 10:
+            megabits = 100
+        case 11, 14, 15, 16, 24, 25:
+            megabits = 1_000
+        case 22:
+            megabits = 2_500
+        case 23:
+            megabits = 5_000
+        case 18, 19, 20, 21, 26, 33, 34, 35:
+            megabits = 10_000
+        case 37, 38, 43, 44, 45, 72, 73, 74:
+            megabits = 40_000
+        case 47, 48, 49, 50, 89, 90, 91:
+            megabits = 100_000
+        default:
+            return nil
+        }
+        return megabits * 1_000_000
     }
 
     private static func sourceAddress(toHost host: String) -> Data? {

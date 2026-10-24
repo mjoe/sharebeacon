@@ -472,6 +472,30 @@ struct NetworkLinkTests {
         #expect(NetworkLink(interfaceName: "en0", kind: .wifi, bitsPerSecond: 1_633_000_000).label == "Wi-Fi 1.6 Gb/s")
     }
 
+    @Test("media subtypes report the negotiated speed")
+    func mediaSubtypesReportSpeed() {
+        // 10Gbase-T, the port a Mac reports with an unknown baud rate.
+        #expect(SystemNetworkLinkResolver.speed(forMediaSubtype: 21) == 10_000_000_000)
+        #expect(SystemNetworkLinkResolver.speed(forMediaSubtype: 23) == 5_000_000_000)
+        #expect(SystemNetworkLinkResolver.speed(forMediaSubtype: 22) == 2_500_000_000)
+        #expect(SystemNetworkLinkResolver.speed(forMediaSubtype: 16) == 1_000_000_000)
+        #expect(SystemNetworkLinkResolver.speed(forMediaSubtype: 6) == 100_000_000)
+        #expect(SystemNetworkLinkResolver.speed(forMediaSubtype: 0) == nil)
+    }
+
+    @Test("an unreported baud rate is not a speed")
+    func unreportedBaudRateIsZero() {
+        #expect(SystemNetworkLinkResolver.usableBaudRate(UInt64(UInt32.max)) == 0)
+        #expect(SystemNetworkLinkResolver.usableBaudRate(10_000_000_000) == 10_000_000_000)
+        let link = NetworkLink(
+            interfaceName: "en0",
+            kind: .wired,
+            bitsPerSecond: SystemNetworkLinkResolver.usableBaudRate(UInt64(UInt32.max))
+        )
+        #expect(link.shortSpeed == nil)
+        #expect(link.label == "Ethernet")
+    }
+
     @Test("short speed fits in a few characters")
     func shortSpeedFitsInFewCharacters() {
         #expect(NetworkLink(interfaceName: "en8", kind: .wired, bitsPerSecond: 2_500_000_000).shortSpeed == "2.5G")
