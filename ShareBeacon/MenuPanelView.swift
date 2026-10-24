@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// The panel the menu bar icon opens: shares grouped by host, each host with
-/// the link its traffic takes, and the app actions in a footer.
+/// the link it runs over, and the app actions in a footer.
 struct MenuPanelView: View {
     @Environment(SMBShareManager.self) private var manager
     @Environment(\.openSettings) private var openSettings
@@ -32,8 +32,6 @@ struct MenuPanelView: View {
                                 HostHeader(
                                     host: group.host,
                                     link: group.link,
-                                    latency: manager.latency(forHost: group.host),
-                                    traffic: manager.traffic(forHost: group.host),
                                     mounted: group.mountedCount,
                                     total: group.shares.count,
                                     collapsed: isCollapsed(group.host),
@@ -56,10 +54,6 @@ struct MenuPanelView: View {
         .frame(width: 380)
         .onAppear {
             manager.refreshStatus()
-            manager.startTrafficSampling()
-        }
-        .onDisappear {
-            manager.stopTrafficSampling()
         }
     }
 
@@ -246,8 +240,6 @@ struct MenuPanelView: View {
 private struct HostHeader: View {
     let host: String
     let link: NetworkLink?
-    let latency: Duration?
-    let traffic: TrafficRate?
     let mounted: Int
     let total: Int
     let collapsed: Bool
@@ -279,20 +271,6 @@ private struct HostHeader: View {
             }
             .buttonStyle(.plain)
 
-            Group {
-                if let label = traffic?.label {
-                    Text(label)
-                } else if let latency {
-                    Text(Self.milliseconds(latency))
-                        .help("Time to open a connection to \(host):445")
-                }
-            }
-            .font(.callout.monospacedDigit())
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            // The rate changes twice a second, so the figure needs a slot of its
-            // own instead of resizing the row around it.
-            .frame(width: 116, alignment: .trailing)
             if let link {
                 LinkBadge(link: link)
             }
@@ -307,12 +285,6 @@ private struct HostHeader: View {
                 .disabled(mounted == 0)
         }
         .animation(.snappy(duration: 0.15), value: collapsed)
-    }
-
-    private static func milliseconds(_ duration: Duration) -> String {
-        let value = Double(duration.components.seconds) * 1_000
-            + Double(duration.components.attoseconds) / 1e15
-        return value < 1 ? "<1 ms" : "\(Int(value.rounded())) ms"
     }
 }
 
@@ -365,22 +337,19 @@ private struct ShareMenuRow: View {
                 Text(share.name)
                     .lineLimit(1)
                     .foregroundStyle(share.isEnabled ? .primary : .secondary)
-                if let detail {
-                    Text(detail)
-                        .font(.callout)
-                        .foregroundStyle(detailColor)
-                        .lineLimit(1)
-                }
+                Text(detail)
+                    .font(.callout)
+                    .foregroundStyle(detailColor)
+                    .lineLimit(1)
             }
             Spacer(minLength: 4)
-            // Info and actions share one slot, so hovering never changes the
-            // row's width or height.
-            ZStack(alignment: .trailing) {
-                trailingInfo
-                    .opacity(isHovered ? 0 : 1)
-                actions
-                    .opacity(isHovered ? 1 : 0)
-                    .allowsHitTesting(isHovered)
+            // One slot, one piece of information, whatever the state.
+            Group {
+                if isMounted, let usage = manager.usage(for: share) {
+                    UsageGauge(usage: usage)
+                } else {
+                    Text("")
+                }
             }
             .frame(width: 168, height: 20, alignment: .trailing)
         }
@@ -438,57 +407,26 @@ private struct ShareMenuRow: View {
         }
     }
 
-    private var detail: String? {
+    /// Always present, so every row has the same height and nothing jumps when
+    /// a share changes state.
+    private var detail: String {
         switch state {
         case .failed(let message): return message
         case .mounted:
             if notResponding { return "Not responding" }
-            if canMoveToCable { return "Cable available" }
-            return offCable ? "Expected a wired link" : nil
-        case .unmounted: return nil
-        default: return state.label
+            if canMoveToCable { return "Cable available, remount to use it" }
+            return offCable ? "Expected a wired link" : "Mounted"
+        case .unmounted: return "Not mounted"
+        case .disabled: return "Disabled"
+        case .mounting, .unmounting, .waitingForNetwork: return state.label
         }
     }
 
     private var detailColor: Color {
         switch state {
         case .failed: return .red
-        case .mounted: return .orange
+        case .mounted: return notResponding || canMoveToCable || offCable ? .orange : .secondary
         default: return .secondary
-        }
-    }
-
-    @ViewBuilder
-    private var trailingInfo: some View {
-        if canMoveToCable {
-            Button {
-                manager.remount(share)
-            } label: {
-                Label("Cable", systemImage: "cable.connector")
-                    .font(.callout.weight(.semibold))
-            }
-            .buttonStyle(.glass)
-            .controlSize(.mini)
-            .help("A cable reaches this host; remount to move the share onto it")
-        } else if offCable, let link = manager.link(for: share) {
-            LinkBadge(link: link)
-        } else if let usage = manager.usage(for: share) {
-            UsageGauge(usage: usage)
-        }
-    }
-
-    @ViewBuilder
-    private var actions: some View {
-        HStack(spacing: 2) {
-            if isMounted {
-                RowIconButton(symbol: "folder", help: "Open in Finder") { manager.openInFinder(share) }
-                RowIconButton(symbol: "arrow.clockwise", help: "Remount") { manager.remount(share) }
-                RowIconButton(symbol: "eject", help: "Unmount") { manager.unmount(share) }
-            } else if share.isEnabled {
-                RowIconButton(symbol: "arrow.up.circle", help: "Mount now") {
-                    manager.mount(share, explicit: true)
-                }
-            }
         }
     }
 
@@ -557,30 +495,6 @@ private struct UsageGauge: View {
         case 0.9...: return .orange
         default: return .accentColor
         }
-    }
-}
-
-private struct RowIconButton: View {
-    let symbol: String
-    let help: String
-    let action: () -> Void
-    @State private var isHovered = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.callout)
-                .frame(width: 24, height: 20)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(isHovered ? AnyShapeStyle(.tertiary.opacity(0.5)) : AnyShapeStyle(.clear))
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(.secondary)
-        .onHover { isHovered = $0 }
-        .help(help)
     }
 }
 

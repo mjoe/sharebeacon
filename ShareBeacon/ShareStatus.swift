@@ -203,45 +203,6 @@ enum ByteFormatting {
         }
         return "\(bytes)B"
     }
-
-    /// A transfer rate such as 120 MB/s, or nil below one kilobyte a second.
-    static func rate(_ bytesPerSecond: Double) -> String? {
-        guard bytesPerSecond >= 1_000 else { return nil }
-        return short(UInt64(bytesPerSecond)) + "B/s"
-    }
-}
-
-/// Bytes per second between two samples of the same session counters.
-struct TrafficRate: Equatable, Sendable {
-    let received: Double
-    let sent: Double
-
-    static let idle = TrafficRate(received: 0, sent: 0)
-
-    init(received: Double, sent: Double) {
-        self.received = received
-        self.sent = sent
-    }
-
-    init(from old: SMBSession, to new: SMBSession, seconds: Double) {
-        guard seconds > 0 else {
-            self = .idle
-            return
-        }
-        // Counters restart with a reconnected session; that interval reads as idle.
-        received = new.receivedBytes >= old.receivedBytes
-            ? Double(new.receivedBytes - old.receivedBytes) / seconds : 0
-        sent = new.sentBytes >= old.sentBytes
-            ? Double(new.sentBytes - old.sentBytes) / seconds : 0
-    }
-
-    var label: String? {
-        let parts = [
-            ByteFormatting.rate(received).map { "↓\($0)" },
-            ByteFormatting.rate(sent).map { "↑\($0)" }
-        ].compactMap { $0 }
-        return parts.isEmpty ? nil : parts.joined(separator: " ")
-    }
 }
 
 // MARK: - URL commands

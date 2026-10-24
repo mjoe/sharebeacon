@@ -543,24 +543,12 @@ struct ShareStatusTests {
         #expect(sessions[1].activeChannel == .init(clientInterface: nil, serverAddress: "192.168.2.49", isActive: true))
     }
 
-    @Test("byte counts and rates are short")
+    @Test("byte counts are short")
     func bytesAreShort() {
         #expect(ByteFormatting.short(3_200_000_000_000) == "3.2T")
         #expect(ByteFormatting.short(18_000_000_000_000) == "18T")
         #expect(ByteFormatting.short(640_000_000_000) == "640G")
         #expect(ByteFormatting.short(2_000_000_000) == "2G")
-        #expect(ByteFormatting.rate(120_000_000) == "120MB/s")
-        #expect(ByteFormatting.rate(500) == nil)
-    }
-
-    @Test("traffic rate is the counter delta per second and idles on a reset")
-    func trafficRateIsCounterDelta() {
-        let old = SMBSession(mountPath: "/v", receivedBytes: 1_000_000, sentBytes: 5_000_000, channels: [])
-        let new = SMBSession(mountPath: "/v", receivedBytes: 241_000_000, sentBytes: 1_000, channels: [])
-        let rate = TrafficRate(from: old, to: new, seconds: 2)
-        #expect(rate.received == 120_000_000)
-        #expect(rate.sent == 0)
-        #expect(rate.label == "↓120MB/s")
     }
 
     @Test("volume usage reports the used fraction and free space")
