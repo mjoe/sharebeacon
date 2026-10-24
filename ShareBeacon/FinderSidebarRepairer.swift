@@ -60,25 +60,28 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
         let candidates = items.map { candidate(for: $0) }
         let plan = finderFavoritePlan(candidates: candidates, mountPath: mountPath)
 
-        if case .collapseDuplicates(_, let drop) = plan {
+        switch plan {
+        case .removeDuplicates(let drop):
             for index in drop {
                 let status = LSSharedFileListItemRemove(list, items[index])
                 if status != noErr {
                     logError("Finder rejected removing a duplicate \(label) item (OSStatus \(status)).")
                 }
             }
-        }
-
-        switch plan {
-        case .collapseDuplicates:
-            // The removals invalidated the snapshot, so read the list again
-            // before moving the surviving entry.
-            return moveToEnd(of: list, mountPath: mountPath, label: label)
+            return true
 
         case .insertNew:
+            // Insert after the last real entry. `kLSSharedFileListItemLast`
+            // reads like the natural anchor, but it is the pointer 0x2 and not
+            // a CF object. Swift retains a CF parameter on the way in, so the
+            // constant crashes the app with EXC_BAD_ACCESS at 0x2.
+            guard let lastItem = items.last else {
+                logError("Finder \(label) list has no valid insertion point.")
+                return false
+            }
             let inserted = LSSharedFileListInsertItemURL(
                 list,
-                kLSSharedFileListItemLast.takeUnretainedValue(),
+                lastItem,
                 name as CFString,
                 nil,
                 mountURL as CFURL,
@@ -90,31 +93,6 @@ struct FinderSidebarRepairer: FinderSidebarRepairing {
             }
             return inserted
         }
-    }
-
-    /// Moves the entry for the mount point to the end of the list so the most
-    /// recently restored share sits last in the sidebar.
-    ///
-    /// The third argument of `LSSharedFileListItemMove` is the entry to move
-    /// after, and `kLSSharedFileListItemLast` means the end of the list. Passing
-    /// the last real entry instead made Finder reject the move with a parameter
-    /// error, so the entry never reached the end.
-    private func moveToEnd(of list: LSSharedFileList, mountPath: String, label: String) -> Bool {
-        guard case .success(let items) = snapshot(of: list, label: label) else {
-            return false
-        }
-        guard let survivor = items.first(where: { resolvedPath(of: $0) == mountPath }) else {
-            return true
-        }
-        let status = LSSharedFileListItemMove(
-            list,
-            survivor,
-            kLSSharedFileListItemLast.takeUnretainedValue()
-        )
-        if status != noErr {
-            logError("Finder rejected moving the \(label) item to the end (OSStatus \(status)).")
-        }
-        return status == noErr
     }
 
     private func snapshot(of list: LSSharedFileList, label: String) -> Result<[LSSharedFileListItem], SnapshotFailure> {

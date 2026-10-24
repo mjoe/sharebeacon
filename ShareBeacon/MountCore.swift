@@ -735,8 +735,8 @@ struct FinderFavoriteCandidate: Equatable, Sendable {
 
 /// What the repairer should do with the entries that point at one mount.
 enum FinderFavoritePlan: Equatable, Sendable {
-    /// Keep the entry at the given candidate index and drop the others.
-    case collapseDuplicates(keep: Int, drop: [Int])
+    /// Surplus entries for a mount whose first entry already represents it.
+    case removeDuplicates([Int])
     /// No entry points at the mount, so insert one.
     case insertNew
 }
@@ -753,8 +753,8 @@ func finderFavoritePlan(
 ) -> FinderFavoritePlan {
     let matches = candidates.indices.filter { candidates[$0].resolvedPath == mountPath }
 
-    guard let keep = matches.first else {
+    guard !matches.isEmpty else {
         return .insertNew
     }
-    return .collapseDuplicates(keep: keep, drop: Array(matches.dropFirst()))
+    return .removeDuplicates(Array(matches.dropFirst()))
 }

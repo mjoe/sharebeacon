@@ -417,7 +417,7 @@ struct ShareBeaconCoreTests {
         #expect(finderFavoritePlan(
             candidates: candidates,
             mountPath: "/Users/tester/Volumes/data"
-        ) == .collapseDuplicates(keep: 1, drop: [2, 3]))
+        ) == .removeDuplicates([2, 3]))
     }
 
     @Test("finder favorite plan keeps a single existing entry untouched")
@@ -430,7 +430,7 @@ struct ShareBeaconCoreTests {
         #expect(finderFavoritePlan(
             candidates: candidates,
             mountPath: "/Users/tester/Volumes/data"
-        ) == .collapseDuplicates(keep: 1, drop: []))
+        ) == .removeDuplicates([]))
     }
 
     @Test("finder favorite plan inserts when no entry matches")
