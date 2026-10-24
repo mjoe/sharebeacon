@@ -8,6 +8,9 @@ struct MenuPanelView: View {
     @Environment(\.openSettings) private var openSettings
     @AppStorage("selectedSettingsTab") private var selectedSettingsTab = SettingsTab.shares.rawValue
     @AppStorage("menuCollapsedHosts") private var collapsedHostsStorage = ""
+    /// Settings reads this to open the editor for a new share. A link or the
+    /// panel can therefore start the add flow without owning the window.
+    @AppStorage("addShareRequested") private var addShareRequested = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -102,6 +105,10 @@ struct MenuPanelView: View {
 
     private var footer: some View {
         HStack(spacing: 2) {
+            FooterButton(title: "Add Share", symbol: "plus") {
+                addShareRequested = true
+                showSettings(tab: .shares)
+            }
             FooterButton(title: "Settings", symbol: "gearshape") {
                 showSettings(tab: .shares)
             }
@@ -247,7 +254,6 @@ private struct HostHeader: View {
     let toggle: () -> Void
     let mountAll: () -> Void
     let unmountAll: () -> Void
-    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: 6) {
@@ -273,25 +279,20 @@ private struct HostHeader: View {
             }
             .buttonStyle(.plain)
 
-            if isHovered {
-                RowIconButton(symbol: "arrow.up.circle", help: "Mount all shares on \(host)", action: mountAll)
-                    .disabled(mounted == total)
-                RowIconButton(symbol: "eject", help: "Unmount all shares on \(host)", action: unmountAll)
-                    .disabled(mounted == 0)
-            } else {
+            Group {
                 if let label = traffic?.label {
                     Text(label)
-                        .font(.callout.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                if let latency {
+                } else if let latency {
                     Text(Self.milliseconds(latency))
-                        .font(.callout.monospacedDigit())
-                        .foregroundStyle(.tertiary)
                         .help("Time to open a connection to \(host):445")
                 }
             }
+            .font(.callout.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            // The rate changes twice a second, so the figure needs a slot of its
+            // own instead of resizing the row around it.
+            .frame(width: 116, alignment: .trailing)
             if let link {
                 LinkBadge(link: link)
             }
@@ -299,7 +300,12 @@ private struct HostHeader: View {
         .padding(.horizontal, 6)
         .padding(.top, 8)
         .padding(.bottom, 3)
-        .onHover { isHovered = $0 }
+        .contextMenu {
+            Button("Mount all shares on \(host)", action: mountAll)
+                .disabled(mounted == total)
+            Button("Unmount all shares on \(host)", action: unmountAll)
+                .disabled(mounted == 0)
+        }
         .animation(.snappy(duration: 0.15), value: collapsed)
     }
 
@@ -367,23 +373,16 @@ private struct ShareMenuRow: View {
                 }
             }
             Spacer(minLength: 4)
-            if isHovered {
+            // Info and actions share one slot, so hovering never changes the
+            // row's width or height.
+            ZStack(alignment: .trailing) {
+                trailingInfo
+                    .opacity(isHovered ? 0 : 1)
                 actions
-            } else if canMoveToCable {
-                Button {
-                    manager.remount(share)
-                } label: {
-                    Label("Cable", systemImage: "cable.connector")
-                        .font(.callout.weight(.semibold))
-                }
-                .buttonStyle(.glass)
-                .controlSize(.mini)
-                .help("A cable reaches this host; remount to move the share onto it")
-            } else if offCable, let link = manager.link(for: share) {
-                LinkBadge(link: link)
-            } else if let usage = manager.usage(for: share) {
-                UsageGauge(usage: usage)
+                    .opacity(isHovered ? 1 : 0)
+                    .allowsHitTesting(isHovered)
             }
+            .frame(width: 168, height: 20, alignment: .trailing)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
@@ -456,6 +455,25 @@ private struct ShareMenuRow: View {
         case .failed: return .red
         case .mounted: return .orange
         default: return .secondary
+        }
+    }
+
+    @ViewBuilder
+    private var trailingInfo: some View {
+        if canMoveToCable {
+            Button {
+                manager.remount(share)
+            } label: {
+                Label("Cable", systemImage: "cable.connector")
+                    .font(.callout.weight(.semibold))
+            }
+            .buttonStyle(.glass)
+            .controlSize(.mini)
+            .help("A cable reaches this host; remount to move the share onto it")
+        } else if offCable, let link = manager.link(for: share) {
+            LinkBadge(link: link)
+        } else if let usage = manager.usage(for: share) {
+            UsageGauge(usage: usage)
         }
     }
 

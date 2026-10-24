@@ -16,6 +16,7 @@ struct SettingsView: View {
     @State private var sharePendingRemoval: ShareConfiguration?
     @State private var isAddingShare = false
     @State private var launchesAtLogin = SMAppService.mainApp.status == .enabled
+    @AppStorage("addShareRequested") private var addShareRequested = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -34,6 +35,17 @@ struct SettingsView: View {
         }
         .tabViewStyle(.tabBarOnly)
         .frame(minWidth: 640, minHeight: 520)
+        .onAppear(perform: consumeAddShareRequest)
+        .onChange(of: addShareRequested) { _, _ in consumeAddShareRequest() }
+    }
+
+    /// Opens the editor for a new share when the menu panel or a link asked
+    /// for it. The flag is cleared so a later visit does not repeat it.
+    private func consumeAddShareRequest() {
+        guard addShareRequested else { return }
+        addShareRequested = false
+        selectedTab = SettingsTab.shares.rawValue
+        isAddingShare = true
     }
 
     private var sharesTab: some View {
