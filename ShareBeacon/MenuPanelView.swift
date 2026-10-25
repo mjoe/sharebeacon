@@ -288,7 +288,7 @@ private struct HostHeader: View {
     }
 }
 
-/// A capsule with the link icon and its short speed, tinted by link kind.
+/// A capsule naming the path to a host, tinted by link kind.
 private struct LinkBadge: View {
     let link: NetworkLink
 
@@ -305,16 +305,12 @@ private struct LinkBadge: View {
         .help("\(link.label) (\(link.interfaceName))")
     }
 
-    /// The badge names the path, not its rate. The rate of a good link says
-    /// nothing about what SMB delivers, and a Wi-Fi rate changes with the
-    /// radio. A wired link below a gigabit is the one speed worth showing,
-    /// because it explains a slow transfer.
+    /// The badge names the path, not its rate. The rate of a link says nothing
+    /// about what SMB delivers, and a Wi-Fi rate moves with the radio, so the
+    /// exact figure lives in the tooltip.
     private var title: String {
         switch link.kind {
         case .wired:
-            if isSlowWired, let speed = NetworkLink.speedLabel(link.bitsPerSecond) {
-                return "Ethernet \(speed)"
-            }
             return "Ethernet"
         case .wifi:
             return "Wi-Fi"
@@ -325,14 +321,7 @@ private struct LinkBadge: View {
         }
     }
 
-    private var isSlowWired: Bool {
-        link.kind == .wired && link.bitsPerSecond > 0 && link.bitsPerSecond < 1_000_000_000
-    }
-
     private var tint: Color {
-        if isSlowWired {
-            return .orange
-        }
         switch link.kind {
         case .wired: return .green
         case .wifi: return .blue

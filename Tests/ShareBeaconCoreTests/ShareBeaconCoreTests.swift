@@ -492,16 +492,7 @@ struct NetworkLinkTests {
             kind: .wired,
             bitsPerSecond: SystemNetworkLinkResolver.usableBaudRate(UInt64(UInt32.max))
         )
-        #expect(link.shortSpeed == nil)
         #expect(link.label == "Ethernet")
-    }
-
-    @Test("short speed fits in a few characters")
-    func shortSpeedFitsInFewCharacters() {
-        #expect(NetworkLink(interfaceName: "en8", kind: .wired, bitsPerSecond: 2_500_000_000).shortSpeed == "2.5G")
-        #expect(NetworkLink(interfaceName: "en4", kind: .wired, bitsPerSecond: 10_000_000_000).shortSpeed == "10G")
-        #expect(NetworkLink(interfaceName: "en0", kind: .wifi, bitsPerSecond: 866_000_000).shortSpeed == "866M")
-        #expect(NetworkLink(interfaceName: "en6", kind: .wired, bitsPerSecond: 0).shortSpeed == nil)
     }
 
     @Test("a wired expectation flags only a known non-wired link")

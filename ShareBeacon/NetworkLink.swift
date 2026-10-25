@@ -42,16 +42,6 @@ struct NetworkLink: Equatable, Sendable {
         }
     }
 
-    /// The link speed in a few characters, such as 2.5G or 866M, for the menu.
-    var shortSpeed: String? {
-        guard bitsPerSecond > 0 else { return nil }
-        let gigabits = Double(bitsPerSecond) / 1_000_000_000
-        if gigabits >= 1 {
-            return "\(Self.trimmed(gigabits))G"
-        }
-        return "\(bitsPerSecond / 1_000_000)M"
-    }
-
     private static func trimmed(_ value: Double) -> String {
         let rounded = (value * 10).rounded() / 10
         return rounded == rounded.rounded() ? String(Int(rounded)) : String(rounded)
