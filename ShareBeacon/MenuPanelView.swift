@@ -296,6 +296,7 @@ private struct LinkBadge: View {
         HStack(spacing: 3) {
             Image(systemName: link.symbolName)
             Text(title)
+                .monospacedDigit()
         }
         .font(.callout.weight(.semibold))
         .foregroundStyle(tint)
@@ -305,13 +306,13 @@ private struct LinkBadge: View {
         .help("\(link.label) (\(link.interfaceName))")
     }
 
-    /// The badge names the path, not its rate. The rate of a link says nothing
-    /// about what SMB delivers, and a Wi-Fi rate moves with the radio, so the
-    /// exact figure lives in the tooltip.
+    /// The badge names the path, and for a wired link also its negotiated
+    /// speed, which holds steady. A Wi-Fi rate moves with the radio, so that
+    /// one stays in the tooltip instead of turning the badge into a counter.
     private var title: String {
         switch link.kind {
         case .wired:
-            return "Ethernet"
+            return link.shortSpeed.map { "Ethernet \($0)" } ?? "Ethernet"
         case .wifi:
             return "Wi-Fi"
         case .tunnel:
