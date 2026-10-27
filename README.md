@@ -19,6 +19,8 @@ reconnects.
 - Settings window with Shares, General, and Log tabs (live log with level filter)
 - Finder sidebar favorite repair with a safe no-op fallback
 - Per-share Finder favorite preference with a general default and per-share override
+- Menu-bar panel with link, free space, health and per-host traffic
+- Cable move and automatic, non-destructive repair of unresponsive shares
 - Liquid Glass controls via the macOS 26 and 27 design system
 - macOS 26 or newer, Apple Silicon and Intel
 
@@ -134,7 +136,7 @@ by Ben Tindall.
 - Ben Tindall ([@othyn](https://github.com/othyn)): original Jockey for macOS author
 - Valentine Ubani Mayaki ([@valmayaki](https://github.com/valmayaki)): security-focused fork and mount-manager improvements
 - Joerg Mattiello ([@mjoe](https://github.com/mjoe)): ShareBeacon maintainer and further development
-- amfire5 ([@ampire5](https://github.com/ampire5)): menu panel concept that became the 1.0 panel
+- ampire5 ([@ampire5](https://github.com/ampire5)): menu panel concept that became the 1.0 panel
 
 ## License
 
