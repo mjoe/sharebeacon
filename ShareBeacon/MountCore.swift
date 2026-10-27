@@ -667,7 +667,10 @@ private final class EndpointCheckCompletion: @unchecked Sendable {
 
 protocol ShareMounting: Sendable {
     func mount(_ share: ShareConfiguration, password: String) throws
-    func unmount(_ share: ShareConfiguration, at mountPoint: String) throws
+
+    /// Unmounts a share. `forcing` must stay false for anything the app does
+    /// on its own: a forced unmount cuts a running copy off.
+    func unmount(_ share: ShareConfiguration, at mountPoint: String, forcing: Bool) throws
 }
 
 struct NetFSShareMounter: ShareMounting {
@@ -705,11 +708,11 @@ struct NetFSShareMounter: ShareMounting {
         }
     }
 
-    func unmount(_ share: ShareConfiguration, at mountPoint: String) throws {
+    func unmount(_ share: ShareConfiguration, at mountPoint: String, forcing: Bool) throws {
         if runUnmount(arguments: ["unmount", mountPoint]) == 0 {
             return
         }
-        if runUnmount(arguments: ["unmount", "force", mountPoint]) == 0 {
+        if forcing, runUnmount(arguments: ["unmount", "force", mountPoint]) == 0 {
             return
         }
         throw ShareBeaconError.unmountFailed(1)

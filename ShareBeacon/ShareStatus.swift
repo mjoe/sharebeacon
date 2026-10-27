@@ -96,10 +96,14 @@ struct SMBSession: Equatable, Sendable {
 /// stall it like any other file system call.
 enum SMBSessionReader {
     /// Returns no sessions when smbutil fails or misses the deadline.
-    static func read(timeout: TimeInterval = 5) -> [SMBSession] {
+    static func read(
+        timeout: TimeInterval = 5,
+        executable: String = "/usr/bin/smbutil",
+        arguments: [String] = ["multichannel", "-a"]
+    ) -> [SMBSession] {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/smbutil")
-        process.arguments = ["multichannel", "-a"]
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
@@ -108,20 +112,44 @@ enum SMBSessionReader {
         } catch {
             return []
         }
+        // Without closing the parent's copy of the write end, the read below
+        // never sees end of file once the child exits.
+        try? pipe.fileHandleForWriting.close()
 
         let output = Mutex(Data())
-        let reader = DispatchSemaphore(value: 0)
+        let finished = DispatchSemaphore(value: 0)
         DispatchQueue.global(qos: .utility).async {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             output.withLock { $0 = data }
-            reader.signal()
+            finished.signal()
         }
-        guard reader.wait(timeout: .now() + timeout) == .success else {
-            process.terminate()
+        guard finished.wait(timeout: .now() + timeout) == .success else {
+            stop(process)
+            _ = finished.wait(timeout: .now() + 2)
             return []
         }
         process.waitUntilExit()
         return SMBSession.parse(String(decoding: output.withLock { $0 }, as: UTF8.self))
+    }
+
+    /// Ends a reader that missed its deadline. A share stuck in the kernel can
+    /// hold smbutil past SIGTERM, and a surviving child would keep the pipe
+    /// open and its reading thread blocked.
+    private static func stop(_ process: Process) {
+        guard process.isRunning else { return }
+        process.terminate()
+        guard !waitForExit(process, timeout: 1) else { return }
+        kill(process.processIdentifier, SIGKILL)
+        _ = waitForExit(process, timeout: 2)
+    }
+
+    private static func waitForExit(_ process: Process, timeout: TimeInterval) -> Bool {
+        let done = DispatchSemaphore(value: 0)
+        DispatchQueue.global(qos: .utility).async {
+            process.waitUntilExit()
+            done.signal()
+        }
+        return done.wait(timeout: .now() + timeout) == .success
     }
 }
 
@@ -155,16 +183,22 @@ enum VolumeProbe: Equatable, Sendable {
     case usage(VolumeUsage)
     /// The file system did not answer before the deadline.
     case unresponsive
+    /// An earlier probe of the same share is still running, so this one made
+    /// no statement either way.
+    case busy
     case unavailable
 }
 
 enum VolumeProber {
     /// Asks the file system for its size on a separate thread and gives up
     /// after `timeout`. A probe that is still stuck is not started again, so
-    /// a hung share holds at most one thread.
+    /// a hung share holds at most one thread. A later probe of that share
+    /// still counts as a miss, because the file system is still not answering.
     static func probe(path: String, timeout: TimeInterval = 4) -> VolumeProbe {
         let claimed = inFlight.withLock { $0.insert(path).inserted }
-        guard claimed else { return .unresponsive }
+        guard claimed else {
+            return stuck.withLock { $0.contains(path) } ? .unresponsive : .busy
+        }
 
         let result = Mutex<VolumeProbe?>(nil)
         let done = DispatchSemaphore(value: 0)
@@ -178,13 +212,19 @@ enum VolumeProber {
                 : .unavailable
             result.withLock { $0 = probe }
             inFlight.withLock { _ = $0.remove(path) }
+            stuck.withLock { _ = $0.remove(path) }
             done.signal()
         }
-        guard done.wait(timeout: .now() + timeout) == .success else { return .unresponsive }
+        guard done.wait(timeout: .now() + timeout) == .success else {
+            stuck.withLock { _ = $0.insert(path) }
+            return .unresponsive
+        }
         return result.withLock { $0 } ?? .unavailable
     }
 
     private static let inFlight = Mutex(Set<String>())
+    /// Paths whose running probe has already missed its deadline.
+    private static let stuck = Mutex(Set<String>())
 }
 
 // MARK: - Formatting

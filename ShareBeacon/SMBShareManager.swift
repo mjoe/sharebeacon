@@ -8,8 +8,8 @@ private actor MountOperationRunner {
         try mounter.mount(share, password: password)
     }
 
-    func unmount(_ mounter: ShareMounting, share: ShareConfiguration, at mountPoint: String) throws {
-        try mounter.unmount(share, at: mountPoint)
+    func unmount(_ mounter: ShareMounting, share: ShareConfiguration, at mountPoint: String, forcing: Bool = true) throws {
+        try mounter.unmount(share, at: mountPoint, forcing: forcing)
     }
 }
 
@@ -83,7 +83,7 @@ final class SMBShareManager: NSObject {
     @ObservationIgnored private var statusTask: Task<Void, Never>?
     @ObservationIgnored private var statusRefreshPending = false
     @ObservationIgnored private var unresponsiveStreaks: [UUID: Int] = [:]
-    private let unresponsiveProbesBeforeRemount = 2
+    private let unresponsiveProbesBeforeRepair = 3
 
     init(
         credentialStore: CredentialStoring = KeychainCredentialStore.shared,
@@ -313,13 +313,17 @@ final class SMBShareManager: NSObject {
                     appendLog("\(share.name) is responding again.")
                 }
                 unresponsiveStreaks[share.id] = nil
+            case .busy:
+                // A probe already runs for this share. That says nothing about
+                // its health, so the streak stays where it is.
+                break
             case .unresponsive:
                 if unresponsive.insert(share.id).inserted {
                     appendLog("\(share.name) is not responding.", level: .warning)
                 }
                 let streak = (unresponsiveStreaks[share.id] ?? 0) + 1
                 unresponsiveStreaks[share.id] = streak
-                if streak == unresponsiveProbesBeforeRemount && share.isEnabled && share.autoMount {
+                if streak == unresponsiveProbesBeforeRepair && share.isEnabled && share.autoMount {
                     stale.append(share)
                 }
             case .unavailable:
@@ -327,8 +331,7 @@ final class SMBShareManager: NSObject {
             }
         }
         for share in stale {
-            appendLog("\(share.name) stopped responding; remounting.", level: .warning)
-            remount(share)
+            repair(share)
         }
     }
 
@@ -344,6 +347,40 @@ final class SMBShareManager: NSObject {
         unresponsiveStreaks[share.id] = nil
         appendLog("Remounting \(share.name).")
         unmount(share, thenMount: share, evenWithoutAutoMount: true)
+    }
+
+    /// Gives a share that stopped answering a fresh session without forcing
+    /// anything out from under a running copy. When the volume is busy the
+    /// unmount fails, which is the answer we want: leave it alone and keep
+    /// showing it as not responding.
+    private func repair(_ share: ShareConfiguration) {
+        guard state(for: share) == .mounted, operations[share.id] == nil else { return }
+        unresponsiveStreaks[share.id] = nil
+        states[share.id] = .unmounting
+        operations[share.id] = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await operationRunner.unmount(
+                    mounter,
+                    share: share,
+                    at: adoptedMountPoints[share.id] ?? share.normalizedMountPoint,
+                    forcing: false
+                )
+                adoptedMountPoints[share.id] = nil
+                operations[share.id] = nil
+                appendLog("Unmounted \(share.name) after it stopped responding.", level: .warning)
+                guard let current = shares.first(where: { $0.id == share.id }) else {
+                    states[share.id] = nil
+                    return
+                }
+                states[share.id] = current.isEnabled ? .unmounted : .disabled
+                mount(current, explicit: true)
+            } catch {
+                operations[share.id] = nil
+                states[share.id] = .mounted
+                appendLog("\(share.name) is busy; left it mounted.", level: .warning)
+            }
+        }
     }
 
     func mountAll(onHost host: String) {
@@ -523,7 +560,8 @@ final class SMBShareManager: NSObject {
     private func unmount(
         _ share: ShareConfiguration,
         thenMount replacement: ShareConfiguration?,
-        evenWithoutAutoMount: Bool = false
+        evenWithoutAutoMount: Bool = false,
+        forcing: Bool = true
     ) {
         guard operations[share.id] == nil else { return }
         states[share.id] = .unmounting
@@ -539,7 +577,12 @@ final class SMBShareManager: NSObject {
             }
 
             do {
-                try await operationRunner.unmount(mounter, share: share, at: adoptedMountPoints[share.id] ?? share.normalizedMountPoint)
+                try await operationRunner.unmount(
+                    mounter,
+                    share: share,
+                    at: adoptedMountPoints[share.id] ?? share.normalizedMountPoint,
+                    forcing: forcing
+                )
                 adoptedMountPoints[share.id] = nil
                 if let current = shares.first(where: { $0.id == share.id }) {
                     states[share.id] = current.isEnabled ? .unmounted : .disabled

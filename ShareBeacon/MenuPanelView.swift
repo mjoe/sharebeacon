@@ -357,9 +357,21 @@ private struct ShareMenuRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
-            // One slot, one piece of information, whatever the state.
+            // One slot, one piece of information, whatever the state. The
+            // cable case takes the slot because it is the one state with an
+            // action worth a click.
             Group {
-                if isMounted, let usage = manager.usage(for: share) {
+                if isMounted, canMoveToCable {
+                    Button {
+                        manager.remount(share)
+                    } label: {
+                        Label("Cable", systemImage: "cable.connector")
+                            .font(.callout.weight(.semibold))
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.mini)
+                    .help("A cable reaches \(share.host). Remount to move this share onto it.")
+                } else if isMounted, let usage = manager.usage(for: share) {
                     UsageGauge(usage: usage)
                 } else {
                     Text("")
@@ -428,7 +440,7 @@ private struct ShareMenuRow: View {
         case .failed(let message): return message
         case .mounted:
             if notResponding { return "Not responding" }
-            if canMoveToCable { return "Cable available, remount to use it" }
+            if canMoveToCable { return "Cable available" }
             return offCable ? "Expected a wired link" : "Mounted"
         case .unmounted: return "Not mounted"
         case .disabled: return "Disabled"
@@ -450,7 +462,7 @@ private struct ShareMenuRow: View {
             .disabled(isMounted || !share.isEnabled)
         Button("Unmount") { manager.unmount(share) }
             .disabled(!isMounted)
-        Button("Remount") { manager.remount(share) }
+        Button(canMoveToCable ? "Remount onto Cable" : "Remount") { manager.remount(share) }
             .disabled(!isMounted)
         Button("Open in Finder") { manager.openInFinder(share) }
             .disabled(!isMounted)

@@ -574,6 +574,19 @@ struct ShareStatusTests {
         #expect(ByteFormatting.short(2_000_000_000) == "2G")
     }
 
+    @Test("a reader that misses its deadline returns and ends its child")
+    func readerGivesUpOnDeadline() {
+        let start = ContinuousClock.now
+        let sessions = SMBSessionReader.read(
+            timeout: 0.3,
+            executable: "/bin/sh",
+            arguments: ["-c", "sleep 5"]
+        )
+        let elapsed = ContinuousClock.now - start
+        #expect(sessions.isEmpty)
+        #expect(elapsed < .seconds(2))
+    }
+
     @Test("volume usage reports the used fraction and free space")
     func volumeUsageReportsFraction() {
         let usage = VolumeUsage(totalBytes: 18_000_000_000_000, freeBytes: 4_500_000_000_000)
