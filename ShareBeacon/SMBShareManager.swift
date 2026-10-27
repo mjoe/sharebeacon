@@ -87,7 +87,8 @@ final class SMBShareManager: NSObject {
     @ObservationIgnored private var unresponsiveStreaks: [UUID: Int] = [:]
     @ObservationIgnored private var trafficTask: Task<Void, Never>?
     @ObservationIgnored private var trafficSamplers = 0
-    private let unresponsiveProbesBeforeRepair = 3
+    @ObservationIgnored private var panelRefreshTask: Task<Void, Never>?
+    private let repairPolicy = RepairPolicy()
 
     init(
         credentialStore: CredentialStoring = KeychainCredentialStore.shared,
@@ -254,8 +255,8 @@ final class SMBShareManager: NSObject {
 
     /// Looks at every mounted share off the main actor: the link its session
     /// uses, the link a new connection would take, its free space and whether
-    /// it still answers. A share that stops answering for two probes in a row
-    /// is remounted when it mounts automatically.
+    /// it still answers. A share that stops answering is repaired after
+    /// `RepairPolicy` has seen enough misses in a row.
     func refreshStatus() {
         guard statusTask == nil else {
             statusRefreshPending = true
@@ -330,9 +331,16 @@ final class SMBShareManager: NSObject {
                 if unresponsive.insert(share.id).inserted {
                     appendLog("\(share.name) is not responding.", level: .warning)
                 }
-                let streak = (unresponsiveStreaks[share.id] ?? 0) + 1
+                let streak = repairPolicy.misses(
+                    after: entry.probe,
+                    current: unresponsiveStreaks[share.id] ?? 0
+                )
                 unresponsiveStreaks[share.id] = streak
-                if streak == unresponsiveProbesBeforeRepair && share.isEnabled && share.autoMount {
+                if repairPolicy.shouldRepair(
+                    misses: streak,
+                    isEnabled: share.isEnabled,
+                    autoMount: share.autoMount
+                ) {
                     stale.append(share)
                 }
             case .unavailable:
@@ -407,6 +415,30 @@ final class SMBShareManager: NSObject {
     private func shares(onHost host: String) -> [ShareConfiguration] {
         let key = Self.hostKey(host)
         return shares.filter { Self.hostKey($0.host) == key }
+    }
+
+    // MARK: Panel
+
+    /// Keeps the panel honest while it is open: re-reads the mount table, so a
+    /// share mounted in Finder shows up, and probes the mounted shares again
+    /// instead of waiting for the one-minute background cycle.
+    func startPanelRefresh() {
+        guard panelRefreshTask == nil else { return }
+        refreshMountStates()
+        refreshStatus()
+        panelRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(10))
+                guard let self, !Task.isCancelled else { return }
+                self.refreshMountStates()
+                self.refreshStatus()
+            }
+        }
+    }
+
+    func stopPanelRefresh() {
+        panelRefreshTask?.cancel()
+        panelRefreshTask = nil
     }
 
     // MARK: Traffic

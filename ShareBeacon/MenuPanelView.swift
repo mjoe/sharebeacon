@@ -54,10 +54,11 @@ struct MenuPanelView: View {
         }
         .frame(width: 380)
         .onAppear {
-            manager.refreshStatus()
+            manager.startPanelRefresh()
             manager.startTrafficSampling()
         }
         .onDisappear {
+            manager.stopPanelRefresh()
             manager.stopTrafficSampling()
         }
     }
