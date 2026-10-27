@@ -16,6 +16,7 @@ struct SettingsView: View {
     @State private var sharePendingRemoval: ShareConfiguration?
     @State private var isAddingShare = false
     @State private var launchesAtLogin = SMAppService.mainApp.status == .enabled
+    @AppStorage("addShareRequested") private var addShareRequested = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -34,6 +35,17 @@ struct SettingsView: View {
         }
         .tabViewStyle(.tabBarOnly)
         .frame(minWidth: 640, minHeight: 520)
+        .onAppear(perform: consumeAddShareRequest)
+        .onChange(of: addShareRequested) { _, _ in consumeAddShareRequest() }
+    }
+
+    /// Opens the editor for a new share when the menu panel or a link asked
+    /// for it. The flag is cleared so a later visit does not repeat it.
+    private func consumeAddShareRequest() {
+        guard addShareRequested else { return }
+        addShareRequested = false
+        selectedTab = SettingsTab.shares.rawValue
+        isAddingShare = true
     }
 
     private var sharesTab: some View {
@@ -57,6 +69,8 @@ struct SettingsView: View {
                             share: share,
                             state: manager.state(for: share),
                             hasPassword: manager.passwordExists(for: share),
+                            link: manager.link(for: share),
+                            isOnUnexpectedLink: manager.isOnUnexpectedLink(share),
                             mount: { manager.mount(share, explicit: true) },
                             unmount: { manager.unmount(share) },
                             open: { manager.openInFinder(share) },
@@ -215,6 +229,8 @@ private struct ShareSettingsRow: View {
     let share: ShareConfiguration
     let state: ShareRuntimeState
     let hasPassword: Bool
+    let link: NetworkLink?
+    let isOnUnexpectedLink: Bool
     let mount: () -> Void
     let unmount: () -> Void
     let open: () -> Void
@@ -271,6 +287,16 @@ private struct ShareSettingsRow: View {
                 Text(share.normalizedMountPoint)
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
+                if let link {
+                    Label(
+                        isOnUnexpectedLink
+                            ? "Via \(link.label) (\(link.interfaceName)), expected a wired link"
+                            : "Via \(link.label) (\(link.interfaceName))",
+                        systemImage: isOnUnexpectedLink ? "wifi.exclamationmark" : link.symbolName
+                    )
+                    .font(.caption)
+                    .foregroundStyle(isOnUnexpectedLink ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                }
                 if case .failed(let message) = state {
                     Text(message)
                         .font(.caption)
@@ -487,6 +513,11 @@ private struct ShareEditorView: View {
                     Text("Never").tag(FinderFavoritePreference.never)
                 }
                 .help("Whether ShareBeacon puts this share back into the Finder favorites after a mount")
+                Picker("Expected link", selection: $share.linkExpectation) {
+                    Text("Any").tag(LinkExpectation.any)
+                    Text("Wired").tag(LinkExpectation.wired)
+                }
+                .help("A share that expects a wired link is flagged when macOS routes it over Wi-Fi or another interface")
 
                 if let errorMessage {
                     Text(errorMessage)

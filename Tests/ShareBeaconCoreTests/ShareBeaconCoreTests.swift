@@ -451,3 +451,418 @@ struct ShareBeaconCoreTests {
         #expect(finderFavoritePlan(candidates: [], mountPath: "/Users/tester/Volumes/data") == .insertNew)
     }
 }
+
+@Suite("Network link")
+struct NetworkLinkTests {
+    @Test("interfaces are classified by type, tunnels by name")
+    func interfacesAreClassified() {
+        #expect(NetworkLink.kind(interfaceName: "en8", systemType: "Ethernet") == .wired)
+        #expect(NetworkLink.kind(interfaceName: "en0", systemType: "IEEE80211") == .wifi)
+        #expect(NetworkLink.kind(interfaceName: "utun4", systemType: nil) == .tunnel)
+        #expect(NetworkLink.kind(interfaceName: "bridge0", systemType: "Bridge") == .other)
+    }
+
+    @Test("wired label carries the link speed")
+    func wiredLabelCarriesSpeed() {
+        #expect(NetworkLink(interfaceName: "en8", kind: .wired, bitsPerSecond: 2_500_000_000).label == "Ethernet 2.5 Gb/s")
+        #expect(NetworkLink(interfaceName: "en4", kind: .wired, bitsPerSecond: 1_000_000_000).label == "Ethernet 1 Gb/s")
+        #expect(NetworkLink(interfaceName: "en5", kind: .wired, bitsPerSecond: 100_000_000).label == "Ethernet 100 Mb/s")
+        #expect(NetworkLink(interfaceName: "en6", kind: .wired, bitsPerSecond: 0).label == "Ethernet")
+        #expect(NetworkLink(interfaceName: "en0", kind: .wifi, bitsPerSecond: 0).label == "Wi-Fi")
+        #expect(NetworkLink(interfaceName: "en0", kind: .wifi, bitsPerSecond: 1_633_000_000).label == "Wi-Fi 1.6 Gb/s")
+    }
+
+    @Test("media subtypes report the negotiated speed")
+    func mediaSubtypesReportSpeed() {
+        // 10Gbase-T, the port a Mac reports with an unknown baud rate.
+        #expect(SystemNetworkLinkResolver.speed(forMediaSubtype: 21) == 10_000_000_000)
+        #expect(SystemNetworkLinkResolver.speed(forMediaSubtype: 23) == 5_000_000_000)
+        #expect(SystemNetworkLinkResolver.speed(forMediaSubtype: 22) == 2_500_000_000)
+        #expect(SystemNetworkLinkResolver.speed(forMediaSubtype: 16) == 1_000_000_000)
+        #expect(SystemNetworkLinkResolver.speed(forMediaSubtype: 6) == 100_000_000)
+        #expect(SystemNetworkLinkResolver.speed(forMediaSubtype: 0) == nil)
+    }
+
+    @Test("an unreported baud rate is not a speed")
+    func unreportedBaudRateIsZero() {
+        #expect(SystemNetworkLinkResolver.usableBaudRate(UInt64(UInt32.max)) == 0)
+        #expect(SystemNetworkLinkResolver.usableBaudRate(10_000_000_000) == 10_000_000_000)
+        let link = NetworkLink(
+            interfaceName: "en0",
+            kind: .wired,
+            bitsPerSecond: SystemNetworkLinkResolver.usableBaudRate(UInt64(UInt32.max))
+        )
+        #expect(link.label == "Ethernet")
+    }
+
+    @Test("short link speed fits in a few characters")
+    func shortSpeedFitsInFewCharacters() {
+        #expect(NetworkLink(interfaceName: "en8", kind: .wired, bitsPerSecond: 2_500_000_000).shortSpeed == "2.5G")
+        #expect(NetworkLink(interfaceName: "en4", kind: .wired, bitsPerSecond: 10_000_000_000).shortSpeed == "10G")
+        #expect(NetworkLink(interfaceName: "en6", kind: .wired, bitsPerSecond: 100_000_000).shortSpeed == "100M")
+        #expect(NetworkLink(interfaceName: "en7", kind: .wired, bitsPerSecond: 0).shortSpeed == nil)
+    }
+
+    @Test("a wired expectation flags only a known non-wired link")
+    func wiredExpectationFlagsNonWiredLinks() {
+        let wifi = NetworkLink(interfaceName: "en0", kind: .wifi, bitsPerSecond: 0)
+        let cable = NetworkLink(interfaceName: "en8", kind: .wired, bitsPerSecond: 0)
+        #expect(!LinkExpectation.wired.isSatisfied(by: wifi))
+        #expect(LinkExpectation.wired.isSatisfied(by: cable))
+        #expect(LinkExpectation.wired.isSatisfied(by: nil))
+        #expect(LinkExpectation.any.isSatisfied(by: wifi))
+    }
+
+    @Test("a stored share without a link expectation accepts any link")
+    func storedShareDefaultsToAnyLink() throws {
+        let json = """
+        [{"id":"8C0E9B5A-4C47-4E0B-9C61-0F6B3C1D2E3F","name":"Data","host":"nas","shareName":"data",
+        "username":"user","mountPoint":"/Users/tester/Volumes/data","isEnabled":true}]
+        """
+        let shares = try JSONDecoder().decode([ShareConfiguration].self, from: Data(json.utf8))
+        #expect(shares.first?.linkExpectation == .any)
+    }
+
+    @Test("the loopback host resolves to the loopback interface")
+    func loopbackResolvesToLoopback() {
+        #expect(SystemNetworkLinkResolver().link(toHost: "127.0.0.1")?.interfaceName == "lo0")
+    }
+}
+
+@Suite("Share status")
+struct ShareStatusTests {
+    static let multichannelOutput = """
+    Session: /Users/tester/Volumes/S$
+    Info: Setup Time: 2026-10-19 17:16:22, Multichannel ON: yes, Reconnect Count: 0
+    \tTotal RX Bytes: 68954026475 (Packets: 11085429)
+    \tTotal TX Bytes: 102567504225 (Packets: 10992981)
+           id         client IF             server IF   state                     server ip                 port   speed
+    ========================================================================================================================
+    M     184  en8    (Ethernet)   19             8 (RSS_0)  [session active       ]   192.168.1.105             445    2.5 Gb
+    Server NIC:
+    \tname: NA, idx: 8, type:    NA, speed 2.5 Gb, state connected
+    \t\tip_addr: 192.168.1.105
+    Client NIC:
+    \tname: en8, idx: 19, type: wired, speed 2.5 Gb, state connected
+
+    Session: /Users/tester/Volumes/18TB-WD-1
+    Info: Setup Time: 2026-10-19 17:16:24, Multichannel ON: no, Reconnect Count: 0
+    \tTotal RX Bytes: 2209343886 (Packets: 3992981)
+    \tTotal TX Bytes: 2140570790 (Packets: 3992968)
+           id         client IF             server IF   state                     server ip                 port   speed
+    ========================================================================================================================
+    M     140     N/A                          N/A      [session active       ]   192.168.2.49              445    N/A
+    """
+
+    @Test("smbutil multichannel output yields sessions, counters and channels")
+    func multichannelOutputParses() throws {
+        let sessions = SMBSession.parse(Self.multichannelOutput)
+        #expect(sessions.count == 2)
+        let windows = try #require(sessions.first)
+        #expect(windows.mountPath == "/Users/tester/Volumes/S$")
+        #expect(windows.receivedBytes == 68_954_026_475)
+        #expect(windows.sentBytes == 102_567_504_225)
+        #expect(windows.activeChannel == .init(clientInterface: "en8", serverAddress: "192.168.1.105", isActive: true))
+        #expect(sessions[1].activeChannel == .init(clientInterface: nil, serverAddress: "192.168.2.49", isActive: true))
+    }
+
+    @Test("byte counts and rates are short")
+    func bytesAreShort() {
+        #expect(ByteFormatting.short(3_200_000_000_000) == "3.2T")
+        #expect(ByteFormatting.short(18_000_000_000_000) == "18T")
+        #expect(ByteFormatting.short(640_000_000_000) == "640G")
+        #expect(ByteFormatting.short(2_000_000_000) == "2G")
+        #expect(ByteFormatting.rate(120_000_000) == "120MB/s")
+        #expect(ByteFormatting.rate(500) == nil)
+    }
+
+    @Test("traffic is the counter delta per second and idles on a reset")
+    func trafficRateIsCounterDelta() {
+        let old = SMBSession(mountPath: "/v", receivedBytes: 1_000_000, sentBytes: 5_000_000, channels: [])
+        let new = SMBSession(mountPath: "/v", receivedBytes: 241_000_000, sentBytes: 1_000, channels: [])
+        let rate = TrafficRate(from: old, to: new, seconds: 2)
+        #expect(rate.received == 120_000_000)
+        #expect(rate.sent == 0)
+        #expect(rate.label == "↓120M")
+        #expect(rate.detail == "120MB/s received")
+    }
+
+    @Test("traffic of sessions on one host adds up")
+    func trafficAddsUpPerHost() {
+        let first = TrafficRate(received: 1_000_000, sent: 2_000)
+        let second = TrafficRate(received: 500_000, sent: 3_000)
+        let sum = first.adding(second)
+        #expect(sum.received == 1_500_000)
+        #expect(sum.sent == 5_000)
+        #expect(sum.label == "↓1.5M ↑5K")
+    }
+
+    @Test("traffic below a kilobyte reads as idle")
+    func trafficBelowThresholdIsIdle() {
+        let rate = TrafficRate(received: 999, sent: 0)
+        #expect(!rate.isActive)
+        #expect(rate.label == nil)
+        #expect(rate.detail == nil)
+    }
+
+    @Test("a reader that misses its deadline returns and ends its child")
+    func readerGivesUpOnDeadline() {
+        let start = ContinuousClock.now
+        let sessions = SMBSessionReader.read(
+            timeout: 0.3,
+            executable: "/bin/sh",
+            arguments: ["-c", "sleep 5"]
+        )
+        let elapsed = ContinuousClock.now - start
+        #expect(sessions.isEmpty)
+        #expect(elapsed < .seconds(2))
+    }
+
+    @Test("volume usage reports the used fraction and free space")
+    func volumeUsageReportsFraction() {
+        let usage = VolumeUsage(totalBytes: 18_000_000_000_000, freeBytes: 4_500_000_000_000)
+        #expect(usage.usedFraction == 0.75)
+        #expect(usage.shortFree == "4.5T")
+        #expect(usage.detail == "4.5T free of 18T")
+    }
+
+    @Test("sharebeacon links parse into commands")
+    func linksParseIntoCommands() throws {
+        func command(_ text: String) -> ShareBeaconCommand? {
+            URL(string: text).flatMap(ShareBeaconCommand.init(url:))
+        }
+        #expect(command("sharebeacon://mount-all") == .mount(.all))
+        #expect(command("sharebeacon://mount?host=NAS") == .mount(.host("NAS")))
+        #expect(command("sharebeacon://mount?share=docs") == .mount(.share("docs")))
+        #expect(command("sharebeacon://unmount?host=NAS&share=docs")
+            == .unmount(.exact(host: "NAS", share: "docs")))
+        #expect(command("sharebeacon://remount?Host=NAS &Share=18TB-WD-1")
+            == .remount(.exact(host: "NAS", share: "18TB-WD-1")))
+        #expect(command("sharebeacon://open?share=S$") == .open("S$"))
+        #expect(command("sharebeacon://settings") == .settings)
+        #expect(command("sharebeacon://mount") == nil)
+        #expect(command("https://mount-all") == nil)
+    }
+
+    @Test("a link cannot unmount or remount without a host and a share")
+    func destructiveLinksNeedHostAndShare() {
+        func command(_ text: String) -> ShareBeaconCommand? {
+            URL(string: text).flatMap(ShareBeaconCommand.init(url:))
+        }
+        #expect(command("sharebeacon://unmount-all") == nil)
+        #expect(command("sharebeacon://remount-all") == nil)
+        #expect(command("sharebeacon://unmount?share=docs") == nil)
+        #expect(command("sharebeacon://unmount?host=NAS") == nil)
+        #expect(command("sharebeacon://unmount?host=&share=docs") == nil)
+        #expect(command("sharebeacon://unmount?host=NAS&share=%20") == nil)
+        #expect(command("sharebeacon://mount?share=") == nil)
+    }
+
+    @Test("a command target matches shares by name, share name or host")
+    func commandTargetsMatchShares() {
+        let share = ShareConfiguration(
+            name: "Data", host: "NAS", shareName: "data-share", username: "u",
+            mountPoint: "/Users/tester/Volumes/data", isEnabled: true
+        )
+        #expect(ShareBeaconCommand.matches(.share("data"), share))
+        #expect(ShareBeaconCommand.matches(.share("DATA-SHARE"), share))
+        #expect(ShareBeaconCommand.matches(.host("nas"), share))
+        #expect(!ShareBeaconCommand.matches(.host("nas2"), share))
+        #expect(ShareBeaconCommand.matches(.exact(host: "nas", share: "Data"), share))
+        #expect(ShareBeaconCommand.matches(.exact(host: "NAS", share: "DATA-SHARE"), share))
+        #expect(!ShareBeaconCommand.matches(.exact(host: "nas2", share: "Data"), share))
+    }
+
+    @Test("a busy probe leaves the miss streak alone")
+    func busyProbeKeepsTheStreak() {
+        let policy = RepairPolicy()
+        #expect(policy.misses(after: .busy, current: 2) == 2)
+    }
+
+    @Test("a stuck probe counts as a miss and an answer clears the streak")
+    func probesCountTowardTheStreak() {
+        let policy = RepairPolicy()
+        #expect(policy.misses(after: .unresponsive, current: 0) == 1)
+        #expect(policy.misses(after: .unresponsive, current: 2) == 3)
+        let usage = VolumeUsage(totalBytes: 100, freeBytes: 50)
+        #expect(policy.misses(after: .usage(usage), current: 2) == 0)
+        #expect(policy.misses(after: .unavailable, current: 2) == 2)
+    }
+
+    @Test("three misses repair only a share that mounts itself")
+    func repairNeedsThreeMissesAndAutoMount() {
+        let policy = RepairPolicy()
+        #expect(!policy.shouldRepair(misses: 2, isEnabled: true, autoMount: true))
+        #expect(policy.shouldRepair(misses: 3, isEnabled: true, autoMount: true))
+        #expect(policy.shouldRepair(misses: 4, isEnabled: true, autoMount: true))
+        #expect(!policy.shouldRepair(misses: 3, isEnabled: false, autoMount: true))
+        #expect(!policy.shouldRepair(misses: 3, isEnabled: true, autoMount: false))
+        #expect(RepairPolicy(missesBeforeRepair: 1).shouldRepair(misses: 1, isEnabled: true, autoMount: true))
+    }
+
+    @Test("a share is marked once and repaired on the third miss")
+    func healthRepairsOnTheThirdMiss() {
+        var health = ShareHealth()
+        let id = UUID()
+        var change = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        #expect(change.becameUnresponsive)
+        #expect(!change.shouldRepair)
+        _ = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        change = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        #expect(!change.becameUnresponsive)
+        #expect(change.shouldRepair)
+        #expect(health.isUnresponsive(id))
+        #expect(health.missStreak(id) == 3)
+    }
+
+    @Test("a share that mounts by hand is never repaired")
+    func healthNeverRepairsManualShare() {
+        var health = ShareHealth()
+        let id = UUID()
+        var change = ShareHealthChange()
+        for _ in 0..<4 {
+            change = health.record(.unresponsive, for: id, isEnabled: true, autoMount: false)
+        }
+        #expect(!change.shouldRepair)
+        #expect(health.missStreak(id) == 4)
+        health.clear(id)
+        #expect(!health.isUnresponsive(id))
+        #expect(health.missStreak(id) == 0)
+    }
+
+    @Test("a probe that is still running does not advance the streak")
+    func healthIgnoresBusyProbes() {        var health = ShareHealth()
+        let id = UUID()
+        _ = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        _ = health.record(.busy, for: id, isEnabled: true, autoMount: true)
+        _ = health.record(.unavailable, for: id, isEnabled: true, autoMount: true)
+        _ = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        #expect(health.missStreak(id) == 2)
+    }
+
+    @Test("activity clears the mark and the streak")
+    func healthActivityRecovers() {
+        var health = ShareHealth()
+        let id = UUID()
+        for _ in 0..<2 {
+            _ = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        }
+        #expect(health.missStreak(id) == 2)
+        let recovered = health.noteActivity(id)
+        #expect(recovered)
+        #expect(!health.isUnresponsive(id))
+        #expect(health.missStreak(id) == 0)
+        let recoveredAgain = health.noteActivity(id)
+        #expect(!recoveredAgain)
+
+        let change = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        #expect(change.becameUnresponsive)
+        #expect(health.missStreak(id) == 1)
+    }
+
+    @Test("an answering probe reports recovery once")
+    func healthUsageRecovers() {        var health = ShareHealth()
+        let id = UUID()
+        _ = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        let usage = VolumeUsage(totalBytes: 10, freeBytes: 5)
+        let change = health.record(.usage(usage), for: id, isEnabled: true, autoMount: true)
+        #expect(change.recovered)
+        #expect(!health.isUnresponsive(id))
+        #expect(health.missStreak(id) == 0)
+        let again = health.record(.usage(usage), for: id, isEnabled: true, autoMount: true)
+        #expect(!again.recovered)
+    }
+
+    @Test("traffic sums the sessions of every share on a host")
+    func hostTrafficSumsShares() {
+        let first = ShareConfiguration(
+            name: "A", host: "nas", shareName: "a", username: "u",
+            mountPoint: "/v/a", isEnabled: true
+        )
+        let second = ShareConfiguration(
+            name: "B", host: "NAS", shareName: "b", username: "u",
+            mountPoint: "/v/b", isEnabled: true
+        )
+        let previous = [
+            "/v/a": SMBSession(mountPath: "/v/a", receivedBytes: 1_000_000, sentBytes: 1_000, channels: []),
+            "/v/b": SMBSession(mountPath: "/v/b", receivedBytes: 500_000, sentBytes: 0, channels: [])
+        ]
+        let current = [
+            "/v/a": SMBSession(mountPath: "/v/a", receivedBytes: 241_000_000, sentBytes: 1_000, channels: []),
+            "/v/b": SMBSession(mountPath: "/v/b", receivedBytes: 3_500_000, sentBytes: 9_000, channels: [])
+        ]
+        let sample = HostTraffic.sample(
+            from: previous,
+            to: current,
+            seconds: 2,
+            over: [first, second],
+            path: { $0.mountPoint }
+        )
+        #expect(sample.rates["nas"]?.received == 121_500_000)
+        #expect(sample.rates["nas"]?.sent == 4_500)
+        #expect(sample.activeShareIDs == [first.id, second.id])
+    }
+
+    @Test("two configurations on one mount are counted once")
+    func hostTrafficCountsOneMountOnce() {
+        let first = ShareConfiguration(
+            name: "A", host: "nas", shareName: "a", username: "u",
+            mountPoint: "/v/same", isEnabled: true
+        )
+        let second = ShareConfiguration(
+            name: "B", host: "nas", shareName: "b", username: "u",
+            mountPoint: "/v/same", isEnabled: true
+        )
+        let previous = ["/v/same": SMBSession(mountPath: "/v/same", receivedBytes: 0, sentBytes: 0, channels: [])]
+        let current = ["/v/same": SMBSession(mountPath: "/v/same", receivedBytes: 240_000_000, sentBytes: 0, channels: [])]
+        let sample = HostTraffic.sample(
+            from: previous,
+            to: current,
+            seconds: 2,
+            over: [first, second],
+            path: { $0.mountPoint }
+        )
+        #expect(sample.rates["nas"]?.received == 120_000_000)
+        #expect(sample.activeShareIDs == [first.id, second.id])
+    }
+
+    @Test("traffic of different hosts stays separate and a reset reads as idle")
+    func hostTrafficSeparatesHostsAndResets() {
+        let first = ShareConfiguration(
+            name: "A", host: "nas", shareName: "a", username: "u",
+            mountPoint: "/v/a", isEnabled: true
+        )
+        let second = ShareConfiguration(
+            name: "B", host: "other", shareName: "b", username: "u",
+            mountPoint: "/v/b", isEnabled: true
+        )
+        let previous = [
+            "/v/a": SMBSession(mountPath: "/v/a", receivedBytes: 5_000_000, sentBytes: 0, channels: []),
+            "/v/b": SMBSession(mountPath: "/v/b", receivedBytes: 0, sentBytes: 0, channels: [])
+        ]
+        let current = [
+            // The counter went backwards after a reconnect.
+            "/v/a": SMBSession(mountPath: "/v/a", receivedBytes: 1_000_000, sentBytes: 0, channels: []),
+            "/v/b": SMBSession(mountPath: "/v/b", receivedBytes: 2_000_000, sentBytes: 0, channels: [])
+        ]
+        let sample = HostTraffic.sample(
+            from: previous,
+            to: current,
+            seconds: 2,
+            over: [first, second],
+            path: { $0.mountPoint }
+        )
+        #expect(sample.rates["nas"]?.received == 0)
+        #expect(sample.rates["other"]?.received == 1_000_000)
+        #expect(sample.activeShareIDs == [second.id])
+    }
+
+    @Test("a probe of a local folder reports its usage")
+    func localProbeReportsUsage() {
+        guard case .usage(let usage) = VolumeProber.probe(path: NSTemporaryDirectory()) else {
+            Issue.record("expected usage")
+            return
+        }
+        #expect(usage.totalBytes > 0)
+    }
+}

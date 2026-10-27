@@ -8,8 +8,8 @@ private actor MountOperationRunner {
         try mounter.mount(share, password: password)
     }
 
-    func unmount(_ mounter: ShareMounting, share: ShareConfiguration, at mountPoint: String) throws {
-        try mounter.unmount(share, at: mountPoint)
+    func unmount(_ mounter: ShareMounting, share: ShareConfiguration, at mountPoint: String, forcing: Bool = true) throws {
+        try mounter.unmount(share, at: mountPoint, forcing: forcing)
     }
 }
 
@@ -53,11 +53,21 @@ final class SMBShareManager: NSObject {
     private(set) var shares: [ShareConfiguration] = []
     private(set) var states: [UUID: ShareRuntimeState] = [:]
     private(set) var restoresFavoritesByDefault = true
+    /// The interface each mounted share's SMB session actually uses.
+    private(set) var links: [UUID: NetworkLink] = [:]
+    /// The interface a new connection to each share's host would take.
+    private(set) var preferredLinks: [UUID: NetworkLink] = [:]
+    private(set) var usages: [UUID: VolumeUsage] = [:]
+    /// Which shares stopped answering, and for how many probes in a row.
+    private(set) var health = ShareHealth()
+    /// Session traffic per host key while the menu panel samples it.
+    private(set) var traffic: [String: TrafficRate] = [:]
 
     @ObservationIgnored private let credentialStore: CredentialStoring
     @ObservationIgnored private let endpointChecker: EndpointChecking
     @ObservationIgnored private let mounter: ShareMounting
     @ObservationIgnored private let finderSidebarRepairer: FinderSidebarRepairing
+    @ObservationIgnored private let linkResolver: NetworkLinkResolving
     @ObservationIgnored private let defaults: UserDefaults
     private let saveKey = "shareBeaconShares"
     private let favoriteKey = "shareBeaconRestoresFavorites"
@@ -73,18 +83,25 @@ final class SMBShareManager: NSObject {
     @ObservationIgnored private var manuallyUnmounted: Set<UUID> = []
     @ObservationIgnored private var isSleeping = false
     @ObservationIgnored private let operationRunner = MountOperationRunner()
+    @ObservationIgnored private var statusTask: Task<Void, Never>?
+    @ObservationIgnored private var statusRefreshPending = false
+    @ObservationIgnored private var trafficTask: Task<Void, Never>?
+    @ObservationIgnored private var trafficSamplers = 0
+    @ObservationIgnored private var panelRefreshTask: Task<Void, Never>?
 
     init(
         credentialStore: CredentialStoring = KeychainCredentialStore.shared,
         endpointChecker: EndpointChecking = SMBEndpointChecker(),
         mounter: ShareMounting = NetFSShareMounter(),
         finderSidebarRepairer: FinderSidebarRepairing = FinderSidebarRepairer(),
+        linkResolver: NetworkLinkResolving = SystemNetworkLinkResolver(),
         defaults: UserDefaults = .standard
     ) {
         self.credentialStore = credentialStore
         self.endpointChecker = endpointChecker
         self.mounter = mounter
         self.finderSidebarRepairer = finderSidebarRepairer
+        self.linkResolver = linkResolver
         self.defaults = defaults
         super.init()
         restoresFavoritesByDefault = defaults.object(forKey: favoriteKey) as? Bool ?? true
@@ -98,12 +115,45 @@ final class SMBShareManager: NSObject {
         networkMonitor?.cancel()
         retryTask?.cancel()
         wakeTask?.cancel()
+        statusTask?.cancel()
+        trafficTask?.cancel()
         operations.values.forEach { $0.cancel() }
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
     func state(for share: ShareConfiguration) -> ShareRuntimeState {
         states[share.id] ?? (share.isEnabled ? .unmounted : .disabled)
+    }
+
+    /// The interface a mounted share is routed through, when it is known.
+    func link(for share: ShareConfiguration) -> NetworkLink? {
+        state(for: share) == .mounted ? links[share.id] : nil
+    }
+
+    /// Whether a cable reaches the share's host while its session still runs
+    /// over another link, so a remount would move it to the cable.
+    func canMoveToCable(_ share: ShareConfiguration) -> Bool {
+        guard let preferred = state(for: share) == .mounted ? preferredLinks[share.id] : nil,
+              let current = link(for: share)
+        else { return false }
+        return preferred.kind == .wired && current.kind != .wired
+    }
+
+    func usage(for share: ShareConfiguration) -> VolumeUsage? {
+        state(for: share) == .mounted ? usages[share.id] : nil
+    }
+
+    func isUnresponsive(_ share: ShareConfiguration) -> Bool {
+        state(for: share) == .mounted && health.isUnresponsive(share.id)
+    }
+
+    func traffic(forHost host: String) -> TrafficRate? {
+        traffic[HostTraffic.hostKey(host)]
+    }
+
+    /// Whether a mounted share runs over a link other than the one it expects.
+    func isOnUnexpectedLink(_ share: ShareConfiguration) -> Bool {
+        !share.linkExpectation.isSatisfied(by: link(for: share))
     }
 
     func passwordExists(for share: ShareConfiguration) -> Bool {
@@ -195,6 +245,275 @@ final class SMBShareManager: NSObject {
         for share in sharesWaitingForAutoMount {
             mount(share)
         }
+        refreshStatus()
+    }
+
+    /// Looks at every mounted share off the main actor: the link its session
+    /// uses, the link a new connection would take, its free space and whether
+    /// it still answers. A share that stops answering is repaired after
+    /// `RepairPolicy` has seen enough misses in a row.
+    func refreshStatus() {
+        guard statusTask == nil else {
+            statusRefreshPending = true
+            return
+        }
+        let targets = shares
+            .filter { state(for: $0) == .mounted }
+            .map { (id: $0.id, host: $0.host, path: mountPath(for: $0)) }
+        let resolver = linkResolver
+        statusTask = Task { [weak self] in
+            let report = await Task.detached {
+                let sessions = SMBSessionReader.read()
+                let byPath = Dictionary(
+                    sessions.map { (URL(fileURLWithPath: $0.mountPath).standardizedFileURL.path, $0) },
+                    uniquingKeysWith: { first, _ in first }
+                )
+                var report: [UUID: (link: NetworkLink?, preferred: NetworkLink?, probe: VolumeProbe)] = [:]
+                for target in targets {
+                    let preferred = resolver.link(toHost: target.host)
+                    let channel = byPath[target.path]?.activeChannel
+                    let link = channel?.clientInterface.flatMap(resolver.link(forInterface:))
+                        ?? channel.flatMap { resolver.link(toHost: $0.serverAddress) }
+                        ?? preferred
+                    report[target.id] = (link, preferred, VolumeProber.probe(path: target.path))
+                }
+                return report
+            }.value
+
+            guard let self else { return }
+            statusTask = nil
+            apply(report)
+            if statusRefreshPending {
+                statusRefreshPending = false
+                refreshStatus()
+            }
+        }
+    }
+
+    private func apply(
+        _ report: [UUID: (link: NetworkLink?, preferred: NetworkLink?, probe: VolumeProbe)]
+    ) {
+        var stale: [ShareConfiguration] = []
+        for share in shares {
+            guard let entry = report[share.id] else { continue }
+            let old = links[share.id]
+            if let new = entry.link, old?.interfaceName != new.interfaceName {
+                if !share.linkExpectation.isSatisfied(by: new) {
+                    appendLog("\(share.name) is routed over \(new.label) (\(new.interfaceName)), not a wired link.", level: .warning)
+                } else if old != nil {
+                    appendLog("\(share.name) is now routed over \(new.label) (\(new.interfaceName)).")
+                }
+            }
+            let couldMove = canMoveToCable(share)
+            links[share.id] = entry.link
+            preferredLinks[share.id] = entry.preferred
+            if !couldMove && canMoveToCable(share) {
+                appendLog("A cable reaches \(share.host), but \(share.name) still runs over \(entry.link?.label ?? "another link"); remount to move it.")
+            }
+
+            switch entry.probe {
+            case .usage(let usage):
+                usages[share.id] = usage
+                let change = health.record(
+                    entry.probe,
+                    for: share.id,
+                    isEnabled: share.isEnabled,
+                    autoMount: share.autoMount
+                )
+                if change.recovered {
+                    appendLog("\(share.name) is responding again.")
+                }
+            case .busy:
+                // A probe already runs for this share. That says nothing about
+                // its health, so the streak stays where it is.
+                break
+            case .unresponsive:
+                let change = health.record(
+                    entry.probe,
+                    for: share.id,
+                    isEnabled: share.isEnabled,
+                    autoMount: share.autoMount
+                )
+                if change.becameUnresponsive {
+                    appendLog("\(share.name) is not responding.", level: .warning)
+                }
+                if change.shouldRepair {
+                    stale.append(share)
+                }
+            case .unavailable:
+                usages[share.id] = nil
+            }
+        }
+        for share in stale {
+            repair(share)
+        }
+    }
+
+    /// Unmounts a share and mounts it again, which also moves its session to
+    /// whatever link the routing table prefers now.
+    func remount(_ share: ShareConfiguration) {
+        guard state(for: share) == .mounted else {
+            mount(share, explicit: true)
+            return
+        }
+        manuallyUnmounted.remove(share.id)
+        health.clear(share.id)
+        appendLog("Remounting \(share.name).")
+        unmount(share, thenMount: share, evenWithoutAutoMount: true)
+    }
+
+    /// Gives a share that stopped answering a fresh session without forcing
+    /// anything out from under a running copy. When the volume is busy the
+    /// unmount fails, which is the answer we want: leave it alone and keep
+    /// showing it as not responding.
+    private func repair(_ share: ShareConfiguration) {
+        guard state(for: share) == .mounted, operations[share.id] == nil else { return }
+        health.clear(share.id)
+        states[share.id] = .unmounting
+        operations[share.id] = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await operationRunner.unmount(
+                    mounter,
+                    share: share,
+                    at: adoptedMountPoints[share.id] ?? share.normalizedMountPoint,
+                    forcing: false
+                )
+                adoptedMountPoints[share.id] = nil
+                operations[share.id] = nil
+                appendLog("Unmounted \(share.name) after it stopped responding.", level: .warning)
+                guard let current = shares.first(where: { $0.id == share.id }) else {
+                    states[share.id] = nil
+                    return
+                }
+                states[share.id] = current.isEnabled ? .unmounted : .disabled
+                mount(current, explicit: true)
+            } catch {
+                operations[share.id] = nil
+                states[share.id] = .mounted
+                appendLog("\(share.name) is busy; left it mounted.", level: .warning)
+            }
+        }
+    }
+
+    func mountAll(onHost host: String) {
+        for share in shares(onHost: host) where share.isEnabled && state(for: share) != .mounted {
+            mount(share, explicit: true)
+        }
+    }
+
+    func unmountAll(onHost host: String) {
+        for share in shares(onHost: host) where state(for: share) == .mounted {
+            unmount(share)
+        }
+    }
+
+    private func shares(onHost host: String) -> [ShareConfiguration] {
+        let key = HostTraffic.hostKey(host)
+        return shares.filter { HostTraffic.hostKey($0.host) == key }
+    }
+
+    // MARK: Panel
+
+    /// Keeps the panel honest while it is open: re-reads the mount table, so a
+    /// share mounted in Finder shows up, and probes the mounted shares again
+    /// instead of waiting for the one-minute background cycle.
+    func startPanelRefresh() {
+        guard panelRefreshTask == nil else { return }
+        refreshMountStates()
+        refreshStatus()
+        panelRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(10))
+                guard let self, !Task.isCancelled else { return }
+                self.refreshMountStates()
+                self.refreshStatus()
+            }
+        }
+    }
+
+    func stopPanelRefresh() {
+        panelRefreshTask?.cancel()
+        panelRefreshTask = nil
+    }
+
+    // MARK: Traffic
+
+    /// Samples session traffic every two seconds while the menu panel is open.
+    /// Rates are summed per host, because two shares on one server can be two
+    /// sessions with their own counters.
+    func startTrafficSampling() {
+        trafficSamplers += 1
+        guard trafficTask == nil else { return }
+        trafficTask = Task { [weak self] in
+            var previous: (sessions: [String: SMBSession], at: ContinuousClock.Instant)?
+            while !Task.isCancelled {
+                let sessions = await Task.detached { SMBSessionReader.read(timeout: 3) }.value
+                let now = ContinuousClock.now
+                guard let self, !Task.isCancelled else { return }
+                let byPath = Dictionary(
+                    sessions.map { (URL(fileURLWithPath: $0.mountPath).standardizedFileURL.path, $0) },
+                    uniquingKeysWith: { first, _ in first }
+                )
+                if let previous, !byPath.isEmpty {
+                    let seconds = Double((now - previous.at).components.seconds)
+                        + Double((now - previous.at).components.attoseconds) / 1e18
+                    let sample = HostTraffic.sample(
+                        from: previous.sessions,
+                        to: byPath,
+                        seconds: seconds,
+                        over: shares.filter { state(for: $0) == .mounted },
+                        path: { mountPath(for: $0) }
+                    )
+                    traffic = sample.rates
+                    noteActivity(in: sample.activeShareIDs)
+                } else {
+                    traffic = [:]
+                }
+                previous = (byPath, now)
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
+    }
+
+    func stopTrafficSampling() {
+        trafficSamplers = max(0, trafficSamplers - 1)
+        guard trafficSamplers == 0 else { return }
+        trafficTask?.cancel()
+        trafficTask = nil
+        traffic = [:]
+    }
+
+    /// Bytes moving through a session are proof that the share answers, so a
+    /// busy copy never looks hung and never triggers a repair.
+    private func noteActivity(in activeShares: Set<UUID>) {
+        guard !activeShares.isEmpty else { return }
+        for id in activeShares where health.noteActivity(id) {
+            guard let share = shares.first(where: { $0.id == id }) else { continue }
+            appendLog("\(share.name) is responding again.")
+        }
+    }
+
+    // MARK: Commands
+
+    /// Runs a `sharebeacon://` command. Settings and Log are left to the caller,
+    /// which owns the windows.
+    func perform(_ command: ShareBeaconCommand) {
+        func matching(_ target: ShareBeaconCommand.Target) -> [ShareConfiguration] {
+            shares.filter { ShareBeaconCommand.matches(target, $0) }
+        }
+        switch command {
+        case .mount(let target):
+            matching(target).filter { $0.isEnabled }.forEach { mount($0, explicit: true) }
+        case .unmount(let target):
+            matching(target).filter { state(for: $0) == .mounted }.forEach { unmount($0) }
+        case .remount(let target):
+            matching(target).filter { $0.isEnabled }.forEach { remount($0) }
+        case .open(let name):
+            matching(.share(name)).filter { state(for: $0) == .mounted }.forEach { openInFinder($0) }
+        case .settings, .log:
+            break
+        }
     }
 
     func mountAllEnabled() {
@@ -211,6 +530,10 @@ final class SMBShareManager: NSObject {
                 && !manuallyUnmounted.contains($0.id)
                 && state(for: $0) != .mounted
         }
+    }
+
+    func mountPath(for share: ShareConfiguration) -> String {
+        adoptedMountPoints[share.id] ?? share.normalizedMountPoint
     }
 
     func mount(_ share: ShareConfiguration, explicit: Bool = false) {
@@ -296,6 +619,7 @@ final class SMBShareManager: NSObject {
                 try await operationRunner.mount(mounter, share: share, password: password)
                 states[share.id] = .mounted
                 appendLog("Mounted \(share.name) at \(share.normalizedMountPoint).")
+                refreshStatus()
                 if restoreFavoriteIfEnabled(for: share, at: nil) {
                     appendLog("Restored Finder favorite for \(share.name).")
                 }
@@ -327,7 +651,12 @@ final class SMBShareManager: NSObject {
         unmount(share, thenMount: nil)
     }
 
-    private func unmount(_ share: ShareConfiguration, thenMount replacement: ShareConfiguration?) {
+    private func unmount(
+        _ share: ShareConfiguration,
+        thenMount replacement: ShareConfiguration?,
+        evenWithoutAutoMount: Bool = false,
+        forcing: Bool = true
+    ) {
         guard operations[share.id] == nil else { return }
         states[share.id] = .unmounting
         operations[share.id] = Task { [weak self] in
@@ -336,13 +665,18 @@ final class SMBShareManager: NSObject {
                 operations[share.id] = nil
                 if let replacement,
                    shares.contains(where: { $0.id == replacement.id }),
-                   replacement.isEnabled && replacement.autoMount {
-                    mount(replacement)
+                   replacement.isEnabled && (replacement.autoMount || evenWithoutAutoMount) {
+                    mount(replacement, explicit: evenWithoutAutoMount)
                 }
             }
 
             do {
-                try await operationRunner.unmount(mounter, share: share, at: adoptedMountPoints[share.id] ?? share.normalizedMountPoint)
+                try await operationRunner.unmount(
+                    mounter,
+                    share: share,
+                    at: adoptedMountPoints[share.id] ?? share.normalizedMountPoint,
+                    forcing: forcing
+                )
                 adoptedMountPoints[share.id] = nil
                 if let current = shares.first(where: { $0.id == share.id }) {
                     states[share.id] = current.isEnabled ? .unmounted : .disabled
@@ -358,7 +692,7 @@ final class SMBShareManager: NSObject {
     }
 
     func openInFinder(_ share: ShareConfiguration) {
-        let path = adoptedMountPoints[share.id] ?? share.normalizedMountPoint
+        let path = mountPath(for: share)
         NSWorkspace.shared.open(URL(fileURLWithPath: path))
     }
 

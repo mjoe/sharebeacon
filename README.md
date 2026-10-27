@@ -59,9 +59,9 @@ including `/Volumes/<share-name>`, can be selected when needed.
 
 ## Versioning
 
-ShareBeacon uses a two-part product version, currently `0.10`.
-Release tags use the same format, for example `v0.10`. Release titles are
-`ShareBeacon <version>` (for example `ShareBeacon 0.10`). Build numbers are
+ShareBeacon uses a two-part product version, currently `1.0`.
+Release tags use the same format, for example `v1.0`. Release titles are
+`ShareBeacon <version>` (for example `ShareBeacon 1.0`). Build numbers are
 separate and increase for each CI build.
 
 The two-part rule is not cosmetic: `0.10` sorts before `0.9` as plain text, so
