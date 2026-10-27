@@ -107,7 +107,7 @@ final class SMBShareManager: NSObject {
     }
 
     func passwordExists(for share: ShareConfiguration) -> Bool {
-        (try? credentialStore.password(for: share)) != nil
+        credentialStore.hasPassword(for: share)
     }
 
     func saveShare(_ share: ShareConfiguration, password: String?) throws {

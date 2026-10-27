@@ -440,6 +440,7 @@ struct MountTable: Sendable {
 protocol CredentialStoring: Sendable {
     func save(password: String, for share: ShareConfiguration) throws
     func password(for share: ShareConfiguration) throws -> String?
+    func hasPassword(for share: ShareConfiguration) -> Bool
     func deletePassword(for share: ShareConfiguration) throws
     func sharedCredentials(forHost host: String) -> [SharedCredential]
     func saveSharedCredential(_ credential: SharedCredential, password: String) throws
@@ -499,6 +500,21 @@ final class KeychainCredentialStore: CredentialStoring, @unchecked Sendable {
             return legacy
         }
         return nil
+    }
+
+    /// Checks for a stored password by its attributes only. Reading the secret
+    /// itself asks the Keychain for access, and an app whose signature the
+    /// item does not trust would then prompt once per share on every redraw.
+    func hasPassword(for share: ShareConfiguration) -> Bool {
+        exists(account: share.credentialAccount)
+            || (share.sharedCredential != nil && exists(account: share.id.uuidString))
+    }
+
+    private func exists(account: String) -> Bool {
+        var lookup = query(account: account)
+        lookup[kSecReturnAttributes as String] = true
+        lookup[kSecMatchLimit as String] = kSecMatchLimitOne
+        return SecItemCopyMatching(lookup as CFDictionary, nil) == errSecSuccess
     }
 
     func deletePassword(for share: ShareConfiguration) throws {
