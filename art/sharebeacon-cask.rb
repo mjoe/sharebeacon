@@ -10,7 +10,7 @@
 
 cask "sharebeacon" do
   version "1.0"
-  sha256 "ef3b822851f02278b81d772afb6c5f01686741134da3e47328eee4215580a752"
+  sha256 "831d122f20e5ff2932b8994b7f94a4db9321e9f2e793ebf2cff9b3fd205f5917"
 
   url "https://github.com/mjoe/sharebeacon/releases/download/v#{version}/ShareBeacon-#{version}.zip"
   name "ShareBeacon"
