@@ -247,9 +247,9 @@ struct RepairPolicy: Equatable, Sendable {
         switch probe {
         case .unresponsive:
             return current + 1
-        case .busy:
+        case .busy, .unavailable:
             return current
-        case .usage, .unavailable:
+        case .usage:
             return 0
         }
     }
@@ -258,6 +258,73 @@ struct RepairPolicy: Equatable, Sendable {
     /// to the user, who may be in the middle of a copy.
     func shouldRepair(misses: Int, isEnabled: Bool, autoMount: Bool) -> Bool {
         isEnabled && autoMount && misses >= missesBeforeRepair
+    }
+}
+
+/// What a probe changed about a share's health.
+struct ShareHealthChange: Equatable, Sendable {
+    /// The share just stopped answering.
+    var becameUnresponsive = false
+    /// The share answered again after being marked unresponsive.
+    var recovered = false
+    /// This miss is the one that should start a repair.
+    var shouldRepair = false
+}
+
+/// Tracks which shares stopped answering and how many probes missed in a row.
+struct ShareHealth: Equatable, Sendable {
+    let policy: RepairPolicy
+    private var unresponsiveShares: Set<UUID> = []
+    private var missStreaks: [UUID: Int] = [:]
+
+    init(policy: RepairPolicy = RepairPolicy()) {
+        self.policy = policy
+    }
+
+    func isUnresponsive(_ id: UUID) -> Bool {
+        unresponsiveShares.contains(id)
+    }
+
+    func missStreak(_ id: UUID) -> Int {
+        missStreaks[id] ?? 0
+    }
+
+    mutating func record(
+        _ probe: VolumeProbe,
+        for id: UUID,
+        isEnabled: Bool,
+        autoMount: Bool
+    ) -> ShareHealthChange {
+        var change = ShareHealthChange()
+        switch probe {
+        case .unresponsive:
+            change.becameUnresponsive = unresponsiveShares.insert(id).inserted
+            let streak = policy.misses(after: probe, current: missStreaks[id] ?? 0)
+            missStreaks[id] = streak
+            change.shouldRepair = policy.shouldRepair(
+                misses: streak,
+                isEnabled: isEnabled,
+                autoMount: autoMount
+            )
+        case .usage:
+            change.recovered = unresponsiveShares.remove(id) != nil
+            missStreaks[id] = nil
+        case .busy, .unavailable:
+            break
+        }
+        return change
+    }
+
+    /// Bytes moving through a session are proof that the share answers, so
+    /// activity clears both the mark and the streak.
+    mutating func noteActivity(_ id: UUID) -> Bool {
+        missStreaks[id] = nil
+        return unresponsiveShares.remove(id) != nil
+    }
+
+    mutating func clear(_ id: UUID) {
+        unresponsiveShares.remove(id)
+        missStreaks[id] = nil
     }
 }
 
@@ -339,6 +406,45 @@ struct TrafficRate: Equatable, Sendable {
             ByteFormatting.rate(sent).map { "\($0) sent" }
         ].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
+}
+
+/// Turns two samples of the session counters into one rate per host.
+enum HostTraffic {
+    struct Sample: Equatable, Sendable {
+        var rates: [String: TrafficRate] = [:]
+        var activeShareIDs: Set<UUID> = []
+    }
+
+    /// Sums the sessions of every mounted share on a host. Two configurations
+    /// can resolve to one mount, so a path counts once but still counts as
+    /// activity for both.
+    static func sample(
+        from previous: [String: SMBSession],
+        to current: [String: SMBSession],
+        seconds: Double,
+        over shares: [ShareConfiguration],
+        path: (ShareConfiguration) -> String
+    ) -> Sample {
+        var sample = Sample()
+        var counted: Set<String> = []
+        for share in shares {
+            let mountPath = path(share)
+            guard let old = previous[mountPath], let new = current[mountPath] else { continue }
+            let rate = TrafficRate(from: old, to: new, seconds: seconds)
+            if rate.isActive {
+                sample.activeShareIDs.insert(share.id)
+            }
+            guard counted.insert(mountPath).inserted else { continue }
+            let key = hostKey(share.host)
+            sample.rates[key] = sample.rates[key].map { $0.adding(rate) } ?? rate
+        }
+        return sample
+    }
+
+    /// Hosts are compared the same way the manager compares them.
+    static func hostKey(_ host: String) -> String {
+        host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 }
 

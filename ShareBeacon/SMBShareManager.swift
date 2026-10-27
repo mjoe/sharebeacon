@@ -58,7 +58,8 @@ final class SMBShareManager: NSObject {
     /// The interface a new connection to each share's host would take.
     private(set) var preferredLinks: [UUID: NetworkLink] = [:]
     private(set) var usages: [UUID: VolumeUsage] = [:]
-    private(set) var unresponsive: Set<UUID> = []
+    /// Which shares stopped answering, and for how many probes in a row.
+    private(set) var health = ShareHealth()
     /// Session traffic per host key while the menu panel samples it.
     private(set) var traffic: [String: TrafficRate] = [:]
 
@@ -84,11 +85,9 @@ final class SMBShareManager: NSObject {
     @ObservationIgnored private let operationRunner = MountOperationRunner()
     @ObservationIgnored private var statusTask: Task<Void, Never>?
     @ObservationIgnored private var statusRefreshPending = false
-    @ObservationIgnored private var unresponsiveStreaks: [UUID: Int] = [:]
     @ObservationIgnored private var trafficTask: Task<Void, Never>?
     @ObservationIgnored private var trafficSamplers = 0
     @ObservationIgnored private var panelRefreshTask: Task<Void, Never>?
-    private let repairPolicy = RepairPolicy()
 
     init(
         credentialStore: CredentialStoring = KeychainCredentialStore.shared,
@@ -145,15 +144,11 @@ final class SMBShareManager: NSObject {
     }
 
     func isUnresponsive(_ share: ShareConfiguration) -> Bool {
-        state(for: share) == .mounted && unresponsive.contains(share.id)
+        state(for: share) == .mounted && health.isUnresponsive(share.id)
     }
 
     func traffic(forHost host: String) -> TrafficRate? {
-        traffic[Self.hostKey(host)]
-    }
-
-    static func hostKey(_ host: String) -> String {
-        host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        traffic[HostTraffic.hostKey(host)]
     }
 
     /// Whether a mounted share runs over a link other than the one it expects.
@@ -319,28 +314,30 @@ final class SMBShareManager: NSObject {
             switch entry.probe {
             case .usage(let usage):
                 usages[share.id] = usage
-                if unresponsive.remove(share.id) != nil {
+                let change = health.record(
+                    entry.probe,
+                    for: share.id,
+                    isEnabled: share.isEnabled,
+                    autoMount: share.autoMount
+                )
+                if change.recovered {
                     appendLog("\(share.name) is responding again.")
                 }
-                unresponsiveStreaks[share.id] = nil
             case .busy:
                 // A probe already runs for this share. That says nothing about
                 // its health, so the streak stays where it is.
                 break
             case .unresponsive:
-                if unresponsive.insert(share.id).inserted {
-                    appendLog("\(share.name) is not responding.", level: .warning)
-                }
-                let streak = repairPolicy.misses(
-                    after: entry.probe,
-                    current: unresponsiveStreaks[share.id] ?? 0
-                )
-                unresponsiveStreaks[share.id] = streak
-                if repairPolicy.shouldRepair(
-                    misses: streak,
+                let change = health.record(
+                    entry.probe,
+                    for: share.id,
                     isEnabled: share.isEnabled,
                     autoMount: share.autoMount
-                ) {
+                )
+                if change.becameUnresponsive {
+                    appendLog("\(share.name) is not responding.", level: .warning)
+                }
+                if change.shouldRepair {
                     stale.append(share)
                 }
             case .unavailable:
@@ -360,8 +357,7 @@ final class SMBShareManager: NSObject {
             return
         }
         manuallyUnmounted.remove(share.id)
-        unresponsive.remove(share.id)
-        unresponsiveStreaks[share.id] = nil
+        health.clear(share.id)
         appendLog("Remounting \(share.name).")
         unmount(share, thenMount: share, evenWithoutAutoMount: true)
     }
@@ -372,7 +368,7 @@ final class SMBShareManager: NSObject {
     /// showing it as not responding.
     private func repair(_ share: ShareConfiguration) {
         guard state(for: share) == .mounted, operations[share.id] == nil else { return }
-        unresponsiveStreaks[share.id] = nil
+        health.clear(share.id)
         states[share.id] = .unmounting
         operations[share.id] = Task { [weak self] in
             guard let self else { return }
@@ -413,8 +409,8 @@ final class SMBShareManager: NSObject {
     }
 
     private func shares(onHost host: String) -> [ShareConfiguration] {
-        let key = Self.hostKey(host)
-        return shares.filter { Self.hostKey($0.host) == key }
+        let key = HostTraffic.hostKey(host)
+        return shares.filter { HostTraffic.hostKey($0.host) == key }
     }
 
     // MARK: Panel
@@ -462,23 +458,15 @@ final class SMBShareManager: NSObject {
                 if let previous, !byPath.isEmpty {
                     let seconds = Double((now - previous.at).components.seconds)
                         + Double((now - previous.at).components.attoseconds) / 1e18
-                    var rates: [String: TrafficRate] = [:]
-                    var countedPaths: Set<String> = []
-                    var active: Set<UUID> = []
-                    for share in shares where state(for: share) == .mounted {
-                        let path = mountPath(for: share)
-                        guard let old = previous.sessions[path], let new = byPath[path] else { continue }
-                        let rate = TrafficRate(from: old, to: new, seconds: seconds)
-                        if rate.isActive {
-                            active.insert(share.id)
-                        }
-                        // Two configurations can resolve to one mount; count it once.
-                        guard countedPaths.insert(path).inserted else { continue }
-                        let key = Self.hostKey(share.host)
-                        rates[key] = rates[key].map { $0.adding(rate) } ?? rate
-                    }
-                    traffic = rates
-                    noteActivity(in: active)
+                    let sample = HostTraffic.sample(
+                        from: previous.sessions,
+                        to: byPath,
+                        seconds: seconds,
+                        over: shares.filter { state(for: $0) == .mounted },
+                        path: { mountPath(for: $0) }
+                    )
+                    traffic = sample.rates
+                    noteActivity(in: sample.activeShareIDs)
                 } else {
                     traffic = [:]
                 }
@@ -500,12 +488,9 @@ final class SMBShareManager: NSObject {
     /// busy copy never looks hung and never triggers a repair.
     private func noteActivity(in activeShares: Set<UUID>) {
         guard !activeShares.isEmpty else { return }
-        for id in activeShares {
-            if unresponsive.remove(id) != nil,
-               let share = shares.first(where: { $0.id == id }) {
-                appendLog("\(share.name) is responding again.")
-            }
-            unresponsiveStreaks[id] = nil
+        for id in activeShares where health.noteActivity(id) {
+            guard let share = shares.first(where: { $0.id == id }) else { continue }
+            appendLog("\(share.name) is responding again.")
         }
     }
 

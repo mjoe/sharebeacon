@@ -686,7 +686,7 @@ struct ShareStatusTests {
         #expect(policy.misses(after: .unresponsive, current: 2) == 3)
         let usage = VolumeUsage(totalBytes: 100, freeBytes: 50)
         #expect(policy.misses(after: .usage(usage), current: 2) == 0)
-        #expect(policy.misses(after: .unavailable, current: 2) == 0)
+        #expect(policy.misses(after: .unavailable, current: 2) == 2)
     }
 
     @Test("three misses repair only a share that mounts itself")
@@ -698,6 +698,163 @@ struct ShareStatusTests {
         #expect(!policy.shouldRepair(misses: 3, isEnabled: false, autoMount: true))
         #expect(!policy.shouldRepair(misses: 3, isEnabled: true, autoMount: false))
         #expect(RepairPolicy(missesBeforeRepair: 1).shouldRepair(misses: 1, isEnabled: true, autoMount: true))
+    }
+
+    @Test("a share is marked once and repaired on the third miss")
+    func healthRepairsOnTheThirdMiss() {
+        var health = ShareHealth()
+        let id = UUID()
+        var change = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        #expect(change.becameUnresponsive)
+        #expect(!change.shouldRepair)
+        _ = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        change = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        #expect(!change.becameUnresponsive)
+        #expect(change.shouldRepair)
+        #expect(health.isUnresponsive(id))
+        #expect(health.missStreak(id) == 3)
+    }
+
+    @Test("a share that mounts by hand is never repaired")
+    func healthNeverRepairsManualShare() {
+        var health = ShareHealth()
+        let id = UUID()
+        var change = ShareHealthChange()
+        for _ in 0..<4 {
+            change = health.record(.unresponsive, for: id, isEnabled: true, autoMount: false)
+        }
+        #expect(!change.shouldRepair)
+        #expect(health.missStreak(id) == 4)
+        health.clear(id)
+        #expect(!health.isUnresponsive(id))
+        #expect(health.missStreak(id) == 0)
+    }
+
+    @Test("a probe that is still running does not advance the streak")
+    func healthIgnoresBusyProbes() {        var health = ShareHealth()
+        let id = UUID()
+        _ = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        _ = health.record(.busy, for: id, isEnabled: true, autoMount: true)
+        _ = health.record(.unavailable, for: id, isEnabled: true, autoMount: true)
+        _ = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        #expect(health.missStreak(id) == 2)
+    }
+
+    @Test("activity clears the mark and the streak")
+    func healthActivityRecovers() {
+        var health = ShareHealth()
+        let id = UUID()
+        for _ in 0..<2 {
+            _ = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        }
+        #expect(health.missStreak(id) == 2)
+        let recovered = health.noteActivity(id)
+        #expect(recovered)
+        #expect(!health.isUnresponsive(id))
+        #expect(health.missStreak(id) == 0)
+        let recoveredAgain = health.noteActivity(id)
+        #expect(!recoveredAgain)
+
+        let change = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        #expect(change.becameUnresponsive)
+        #expect(health.missStreak(id) == 1)
+    }
+
+    @Test("an answering probe reports recovery once")
+    func healthUsageRecovers() {        var health = ShareHealth()
+        let id = UUID()
+        _ = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        let usage = VolumeUsage(totalBytes: 10, freeBytes: 5)
+        let change = health.record(.usage(usage), for: id, isEnabled: true, autoMount: true)
+        #expect(change.recovered)
+        #expect(!health.isUnresponsive(id))
+        #expect(health.missStreak(id) == 0)
+        let again = health.record(.usage(usage), for: id, isEnabled: true, autoMount: true)
+        #expect(!again.recovered)
+    }
+
+    @Test("traffic sums the sessions of every share on a host")
+    func hostTrafficSumsShares() {
+        let first = ShareConfiguration(
+            name: "A", host: "nas", shareName: "a", username: "u",
+            mountPoint: "/v/a", isEnabled: true
+        )
+        let second = ShareConfiguration(
+            name: "B", host: "NAS", shareName: "b", username: "u",
+            mountPoint: "/v/b", isEnabled: true
+        )
+        let previous = [
+            "/v/a": SMBSession(mountPath: "/v/a", receivedBytes: 1_000_000, sentBytes: 1_000, channels: []),
+            "/v/b": SMBSession(mountPath: "/v/b", receivedBytes: 500_000, sentBytes: 0, channels: [])
+        ]
+        let current = [
+            "/v/a": SMBSession(mountPath: "/v/a", receivedBytes: 241_000_000, sentBytes: 1_000, channels: []),
+            "/v/b": SMBSession(mountPath: "/v/b", receivedBytes: 3_500_000, sentBytes: 9_000, channels: [])
+        ]
+        let sample = HostTraffic.sample(
+            from: previous,
+            to: current,
+            seconds: 2,
+            over: [first, second],
+            path: { $0.mountPoint }
+        )
+        #expect(sample.rates["nas"]?.received == 121_500_000)
+        #expect(sample.rates["nas"]?.sent == 4_500)
+        #expect(sample.activeShareIDs == [first.id, second.id])
+    }
+
+    @Test("two configurations on one mount are counted once")
+    func hostTrafficCountsOneMountOnce() {
+        let first = ShareConfiguration(
+            name: "A", host: "nas", shareName: "a", username: "u",
+            mountPoint: "/v/same", isEnabled: true
+        )
+        let second = ShareConfiguration(
+            name: "B", host: "nas", shareName: "b", username: "u",
+            mountPoint: "/v/same", isEnabled: true
+        )
+        let previous = ["/v/same": SMBSession(mountPath: "/v/same", receivedBytes: 0, sentBytes: 0, channels: [])]
+        let current = ["/v/same": SMBSession(mountPath: "/v/same", receivedBytes: 240_000_000, sentBytes: 0, channels: [])]
+        let sample = HostTraffic.sample(
+            from: previous,
+            to: current,
+            seconds: 2,
+            over: [first, second],
+            path: { $0.mountPoint }
+        )
+        #expect(sample.rates["nas"]?.received == 120_000_000)
+        #expect(sample.activeShareIDs == [first.id, second.id])
+    }
+
+    @Test("traffic of different hosts stays separate and a reset reads as idle")
+    func hostTrafficSeparatesHostsAndResets() {
+        let first = ShareConfiguration(
+            name: "A", host: "nas", shareName: "a", username: "u",
+            mountPoint: "/v/a", isEnabled: true
+        )
+        let second = ShareConfiguration(
+            name: "B", host: "other", shareName: "b", username: "u",
+            mountPoint: "/v/b", isEnabled: true
+        )
+        let previous = [
+            "/v/a": SMBSession(mountPath: "/v/a", receivedBytes: 5_000_000, sentBytes: 0, channels: []),
+            "/v/b": SMBSession(mountPath: "/v/b", receivedBytes: 0, sentBytes: 0, channels: [])
+        ]
+        let current = [
+            // The counter went backwards after a reconnect.
+            "/v/a": SMBSession(mountPath: "/v/a", receivedBytes: 1_000_000, sentBytes: 0, channels: []),
+            "/v/b": SMBSession(mountPath: "/v/b", receivedBytes: 2_000_000, sentBytes: 0, channels: [])
+        ]
+        let sample = HostTraffic.sample(
+            from: previous,
+            to: current,
+            seconds: 2,
+            over: [first, second],
+            path: { $0.mountPoint }
+        )
+        #expect(sample.rates["nas"]?.received == 0)
+        #expect(sample.rates["other"]?.received == 1_000_000)
+        #expect(sample.activeShareIDs == [second.id])
     }
 
     @Test("a probe of a local folder reports its usage")
