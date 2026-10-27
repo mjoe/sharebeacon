@@ -243,6 +243,69 @@ enum ByteFormatting {
         }
         return "\(bytes)B"
     }
+
+    /// A transfer rate such as 120MB/s, or nil below one kilobyte a second.
+    static func rate(_ bytesPerSecond: Double) -> String? {
+        guard bytesPerSecond >= 1_000 else { return nil }
+        return short(UInt64(bytesPerSecond)) + "B/s"
+    }
+}
+
+/// Bytes per second between two samples of the same session counters.
+struct TrafficRate: Equatable, Sendable {
+    let received: Double
+    let sent: Double
+
+    init(received: Double, sent: Double) {
+        self.received = received
+        self.sent = sent
+    }
+
+    init(from old: SMBSession, to new: SMBSession, seconds: Double) {
+        guard seconds > 0 else {
+            received = 0
+            sent = 0
+            return
+        }
+        // Counters restart with a reconnected session; that interval reads as idle.
+        received = new.receivedBytes >= old.receivedBytes
+            ? Double(new.receivedBytes - old.receivedBytes) / seconds : 0
+        sent = new.sentBytes >= old.sentBytes
+            ? Double(new.sentBytes - old.sentBytes) / seconds : 0
+    }
+
+    /// Whether either direction is above the display threshold. Below one
+    /// kilobyte a second the figure is noise, not activity.
+    var isActive: Bool {
+        received >= 1_000 || sent >= 1_000
+    }
+
+    /// Two rates of sessions on one host add up.
+    func adding(_ other: TrafficRate) -> TrafficRate {
+        TrafficRate(received: received + other.received, sent: sent + other.sent)
+    }
+
+    /// Compact enough for a fixed slot in the host header.
+    var label: String? {
+        guard isActive else { return nil }
+        var parts: [String] = []
+        if received >= 1_000 {
+            parts.append("↓\(ByteFormatting.short(UInt64(received)))")
+        }
+        if sent >= 1_000 {
+            parts.append("↑\(ByteFormatting.short(UInt64(sent)))")
+        }
+        return parts.joined(separator: " ")
+    }
+
+    var detail: String? {
+        guard isActive else { return nil }
+        let parts = [
+            ByteFormatting.rate(received).map { "\($0) received" },
+            ByteFormatting.rate(sent).map { "\($0) sent" }
+        ].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
 }
 
 // MARK: - URL commands

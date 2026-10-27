@@ -59,6 +59,8 @@ final class SMBShareManager: NSObject {
     private(set) var preferredLinks: [UUID: NetworkLink] = [:]
     private(set) var usages: [UUID: VolumeUsage] = [:]
     private(set) var unresponsive: Set<UUID> = []
+    /// Session traffic per host key while the menu panel samples it.
+    private(set) var traffic: [String: TrafficRate] = [:]
 
     @ObservationIgnored private let credentialStore: CredentialStoring
     @ObservationIgnored private let endpointChecker: EndpointChecking
@@ -83,6 +85,8 @@ final class SMBShareManager: NSObject {
     @ObservationIgnored private var statusTask: Task<Void, Never>?
     @ObservationIgnored private var statusRefreshPending = false
     @ObservationIgnored private var unresponsiveStreaks: [UUID: Int] = [:]
+    @ObservationIgnored private var trafficTask: Task<Void, Never>?
+    @ObservationIgnored private var trafficSamplers = 0
     private let unresponsiveProbesBeforeRepair = 3
 
     init(
@@ -112,6 +116,7 @@ final class SMBShareManager: NSObject {
         retryTask?.cancel()
         wakeTask?.cancel()
         statusTask?.cancel()
+        trafficTask?.cancel()
         operations.values.forEach { $0.cancel() }
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
@@ -140,6 +145,10 @@ final class SMBShareManager: NSObject {
 
     func isUnresponsive(_ share: ShareConfiguration) -> Bool {
         state(for: share) == .mounted && unresponsive.contains(share.id)
+    }
+
+    func traffic(forHost host: String) -> TrafficRate? {
+        traffic[Self.hostKey(host)]
     }
 
     static func hostKey(_ host: String) -> String {
@@ -398,6 +407,74 @@ final class SMBShareManager: NSObject {
     private func shares(onHost host: String) -> [ShareConfiguration] {
         let key = Self.hostKey(host)
         return shares.filter { Self.hostKey($0.host) == key }
+    }
+
+    // MARK: Traffic
+
+    /// Samples session traffic every two seconds while the menu panel is open.
+    /// Rates are summed per host, because two shares on one server can be two
+    /// sessions with their own counters.
+    func startTrafficSampling() {
+        trafficSamplers += 1
+        guard trafficTask == nil else { return }
+        trafficTask = Task { [weak self] in
+            var previous: (sessions: [String: SMBSession], at: ContinuousClock.Instant)?
+            while !Task.isCancelled {
+                let sessions = await Task.detached { SMBSessionReader.read(timeout: 3) }.value
+                let now = ContinuousClock.now
+                guard let self, !Task.isCancelled else { return }
+                let byPath = Dictionary(
+                    sessions.map { (URL(fileURLWithPath: $0.mountPath).standardizedFileURL.path, $0) },
+                    uniquingKeysWith: { first, _ in first }
+                )
+                if let previous, !byPath.isEmpty {
+                    let seconds = Double((now - previous.at).components.seconds)
+                        + Double((now - previous.at).components.attoseconds) / 1e18
+                    var rates: [String: TrafficRate] = [:]
+                    var countedPaths: Set<String> = []
+                    var active: Set<UUID> = []
+                    for share in shares where state(for: share) == .mounted {
+                        let path = mountPath(for: share)
+                        guard let old = previous.sessions[path], let new = byPath[path] else { continue }
+                        let rate = TrafficRate(from: old, to: new, seconds: seconds)
+                        if rate.isActive {
+                            active.insert(share.id)
+                        }
+                        // Two configurations can resolve to one mount; count it once.
+                        guard countedPaths.insert(path).inserted else { continue }
+                        let key = Self.hostKey(share.host)
+                        rates[key] = rates[key].map { $0.adding(rate) } ?? rate
+                    }
+                    traffic = rates
+                    noteActivity(in: active)
+                } else {
+                    traffic = [:]
+                }
+                previous = (byPath, now)
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
+    }
+
+    func stopTrafficSampling() {
+        trafficSamplers = max(0, trafficSamplers - 1)
+        guard trafficSamplers == 0 else { return }
+        trafficTask?.cancel()
+        trafficTask = nil
+        traffic = [:]
+    }
+
+    /// Bytes moving through a session are proof that the share answers, so a
+    /// busy copy never looks hung and never triggers a repair.
+    private func noteActivity(in activeShares: Set<UUID>) {
+        guard !activeShares.isEmpty else { return }
+        for id in activeShares {
+            if unresponsive.remove(id) != nil,
+               let share = shares.first(where: { $0.id == id }) {
+                appendLog("\(share.name) is responding again.")
+            }
+            unresponsiveStreaks[id] = nil
+        }
     }
 
     // MARK: Commands

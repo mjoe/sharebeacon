@@ -32,6 +32,7 @@ struct MenuPanelView: View {
                                 HostHeader(
                                     host: group.host,
                                     link: group.link,
+                                    traffic: manager.traffic(forHost: group.host),
                                     mounted: group.mountedCount,
                                     total: group.shares.count,
                                     collapsed: isCollapsed(group.host),
@@ -54,6 +55,10 @@ struct MenuPanelView: View {
         .frame(width: 380)
         .onAppear {
             manager.refreshStatus()
+            manager.startTrafficSampling()
+        }
+        .onDisappear {
+            manager.stopTrafficSampling()
         }
     }
 
@@ -240,6 +245,7 @@ struct MenuPanelView: View {
 private struct HostHeader: View {
     let host: String
     let link: NetworkLink?
+    let traffic: TrafficRate?
     let mounted: Int
     let total: Int
     let collapsed: Bool
@@ -270,6 +276,14 @@ private struct HostHeader: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+
+            // The figure changes, the slot does not.
+            Text(traffic?.label ?? "")
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(width: 96, alignment: .trailing)
+                .help(traffic?.detail ?? "")
 
             if let link {
                 LinkBadge(link: link)
@@ -306,13 +320,14 @@ private struct LinkBadge: View {
         .help("\(link.label) (\(link.interfaceName))")
     }
 
-    /// The badge names the path, and for a wired link also its negotiated
-    /// speed, which holds steady. A Wi-Fi rate moves with the radio, so that
-    /// one stays in the tooltip instead of turning the badge into a counter.
+    /// The badge names the path. A wired link shows its negotiated speed
+    /// instead of the word, because the cable icon already says what it is and
+    /// the header needs the room. A Wi-Fi rate moves with the radio, so that
+    /// one stays in the tooltip.
     private var title: String {
         switch link.kind {
         case .wired:
-            return link.shortSpeed.map { "Ethernet \($0)" } ?? "Ethernet"
+            return link.shortSpeed ?? "Ethernet"
         case .wifi:
             return "Wi-Fi"
         case .tunnel:

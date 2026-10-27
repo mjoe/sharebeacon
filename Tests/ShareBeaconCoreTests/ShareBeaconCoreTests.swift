@@ -566,12 +566,43 @@ struct ShareStatusTests {
         #expect(sessions[1].activeChannel == .init(clientInterface: nil, serverAddress: "192.168.2.49", isActive: true))
     }
 
-    @Test("byte counts are short")
+    @Test("byte counts and rates are short")
     func bytesAreShort() {
         #expect(ByteFormatting.short(3_200_000_000_000) == "3.2T")
         #expect(ByteFormatting.short(18_000_000_000_000) == "18T")
         #expect(ByteFormatting.short(640_000_000_000) == "640G")
         #expect(ByteFormatting.short(2_000_000_000) == "2G")
+        #expect(ByteFormatting.rate(120_000_000) == "120MB/s")
+        #expect(ByteFormatting.rate(500) == nil)
+    }
+
+    @Test("traffic is the counter delta per second and idles on a reset")
+    func trafficRateIsCounterDelta() {
+        let old = SMBSession(mountPath: "/v", receivedBytes: 1_000_000, sentBytes: 5_000_000, channels: [])
+        let new = SMBSession(mountPath: "/v", receivedBytes: 241_000_000, sentBytes: 1_000, channels: [])
+        let rate = TrafficRate(from: old, to: new, seconds: 2)
+        #expect(rate.received == 120_000_000)
+        #expect(rate.sent == 0)
+        #expect(rate.label == "↓120M")
+        #expect(rate.detail == "120MB/s received")
+    }
+
+    @Test("traffic of sessions on one host adds up")
+    func trafficAddsUpPerHost() {
+        let first = TrafficRate(received: 1_000_000, sent: 2_000)
+        let second = TrafficRate(received: 500_000, sent: 3_000)
+        let sum = first.adding(second)
+        #expect(sum.received == 1_500_000)
+        #expect(sum.sent == 5_000)
+        #expect(sum.label == "↓1.5M ↑5K")
+    }
+
+    @Test("traffic below a kilobyte reads as idle")
+    func trafficBelowThresholdIsIdle() {
+        let rate = TrafficRate(received: 999, sent: 0)
+        #expect(!rate.isActive)
+        #expect(rate.label == nil)
+        #expect(rate.detail == nil)
     }
 
     @Test("a reader that misses its deadline returns and ends its child")
