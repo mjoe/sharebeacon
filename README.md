@@ -134,6 +134,7 @@ by Ben Tindall.
 - Ben Tindall ([@othyn](https://github.com/othyn)): original Jockey for macOS author
 - Valentine Ubani Mayaki ([@valmayaki](https://github.com/valmayaki)): security-focused fork and mount-manager improvements
 - Joerg Mattiello ([@mjoe](https://github.com/mjoe)): ShareBeacon maintainer and further development
+- amfire5 ([@ampire5](https://github.com/ampire5)): menu panel concept that became the 1.0 panel
 
 ## License
 
