@@ -227,6 +227,40 @@ enum VolumeProber {
     private static let stuck = Mutex(Set<String>())
 }
 
+/// The rule that turns consecutive misses into a repair. Kept apart from the
+/// manager so the decision can be tested without a mount.
+struct RepairPolicy: Equatable, Sendable {
+    /// Three misses in a row. One slow answer is not a hang, and a repair
+    /// costs a reconnect, so the threshold stays above one.
+    static let defaultMissesBeforeRepair = 3
+
+    let missesBeforeRepair: Int
+
+    init(missesBeforeRepair: Int = RepairPolicy.defaultMissesBeforeRepair) {
+        self.missesBeforeRepair = missesBeforeRepair
+    }
+
+    /// A probe that found the volume busy says nothing about its health, so it
+    /// leaves the streak alone. A stuck probe counts, because the file system
+    /// still did not answer.
+    func misses(after probe: VolumeProbe, current: Int) -> Int {
+        switch probe {
+        case .unresponsive:
+            return current + 1
+        case .busy:
+            return current
+        case .usage, .unavailable:
+            return 0
+        }
+    }
+
+    /// Only shares that mount themselves are repaired. A manual mount belongs
+    /// to the user, who may be in the middle of a copy.
+    func shouldRepair(misses: Int, isEnabled: Bool, autoMount: Bool) -> Bool {
+        isEnabled && autoMount && misses >= missesBeforeRepair
+    }
+}
+
 // MARK: - Formatting
 
 enum ByteFormatting {
@@ -315,6 +349,10 @@ enum ShareBeaconCommand: Equatable, Sendable {
     enum Target: Equatable, Sendable {
         case share(String)
         case host(String)
+        /// A named share on a named host. Commands that change a mount require
+        /// this, so a link cannot hit every server that has a share of the
+        /// same name.
+        case exact(host: String, share: String)
         case all
     }
 
@@ -325,10 +363,12 @@ enum ShareBeaconCommand: Equatable, Sendable {
     case settings
     case log
 
-    /// Accepts `sharebeacon://mount-all`, `sharebeacon://unmount-all`,
-    /// `sharebeacon://mount?share=Name`, `sharebeacon://unmount?host=nas`,
-    /// `sharebeacon://remount?share=Name`, `sharebeacon://open?share=Name`,
-    /// `sharebeacon://settings` and `sharebeacon://log`.
+    /// Accepts `sharebeacon://mount-all`, `sharebeacon://mount?share=Name`,
+    /// `sharebeacon://mount?host=nas`, `sharebeacon://unmount?host=nas&share=Name`,
+    /// `sharebeacon://remount?host=nas&share=Name`, `sharebeacon://open?share=Name`,
+    /// `sharebeacon://settings` and `sharebeacon://log`. Commands that change a
+    /// mount need both host and share: a bare share name would match every
+    /// server that uses it, and a bare host would unmount all of its shares.
     init?(url: URL) {
         guard url.scheme?.lowercased() == "sharebeacon",
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -340,16 +380,30 @@ enum ShareBeaconCommand: Equatable, Sendable {
             (components.queryItems ?? []).compactMap { item in item.value.map { (item.name.lowercased(), $0) } },
             uniquingKeysWith: { first, _ in first }
         )
-        let target: Target? = query["share"].map(Target.share) ?? query["host"].map(Target.host)
+        func value(_ key: String) -> String? {
+            guard let text = query[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !text.isEmpty
+            else { return nil }
+            return text
+        }
+        let shareName = value("share")
+        let hostName = value("host")
+        let exact: Target? = {
+            guard let shareName, let hostName else { return nil }
+            return .exact(host: hostName, share: shareName)
+        }()
 
         switch action {
         case "mount-all": self = .mount(.all)
-        case "unmount-all": self = .unmount(.all)
-        case "remount-all": self = .remount(.all)
-        case "mount": guard let target else { return nil }; self = .mount(target)
-        case "unmount": guard let target else { return nil }; self = .unmount(target)
-        case "remount": guard let target else { return nil }; self = .remount(target)
-        case "open": guard let name = query["share"] else { return nil }; self = .open(name)
+        case "mount":
+            guard let target = exact
+                ?? shareName.map(Target.share)
+                ?? hostName.map(Target.host)
+            else { return nil }
+            self = .mount(target)
+        case "unmount": guard let exact else { return nil }; self = .unmount(exact)
+        case "remount": guard let exact else { return nil }; self = .remount(exact)
+        case "open": guard let name = shareName else { return nil }; self = .open(name)
         case "settings": self = .settings
         case "log": self = .log
         default: return nil
@@ -367,6 +421,10 @@ enum ShareBeaconCommand: Equatable, Sendable {
         case .host(let host):
             return share.host.trimmingCharacters(in: .whitespacesAndNewlines)
                 .caseInsensitiveCompare(host) == .orderedSame
+        case .exact(let host, let name):
+            return matches(.host(host), share)
+                && (share.name.caseInsensitiveCompare(name) == .orderedSame
+                    || share.shareName.caseInsensitiveCompare(name) == .orderedSame)
         }
     }
 }

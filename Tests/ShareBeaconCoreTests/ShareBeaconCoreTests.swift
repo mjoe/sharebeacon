@@ -632,12 +632,30 @@ struct ShareStatusTests {
             URL(string: text).flatMap(ShareBeaconCommand.init(url:))
         }
         #expect(command("sharebeacon://mount-all") == .mount(.all))
-        #expect(command("sharebeacon://unmount?host=NAS") == .unmount(.host("NAS")))
-        #expect(command("sharebeacon://remount?share=18TB-WD-1") == .remount(.share("18TB-WD-1")))
+        #expect(command("sharebeacon://mount?host=NAS") == .mount(.host("NAS")))
+        #expect(command("sharebeacon://mount?share=docs") == .mount(.share("docs")))
+        #expect(command("sharebeacon://unmount?host=NAS&share=docs")
+            == .unmount(.exact(host: "NAS", share: "docs")))
+        #expect(command("sharebeacon://remount?Host=NAS &Share=18TB-WD-1")
+            == .remount(.exact(host: "NAS", share: "18TB-WD-1")))
         #expect(command("sharebeacon://open?share=S$") == .open("S$"))
         #expect(command("sharebeacon://settings") == .settings)
         #expect(command("sharebeacon://mount") == nil)
         #expect(command("https://mount-all") == nil)
+    }
+
+    @Test("a link cannot unmount or remount without a host and a share")
+    func destructiveLinksNeedHostAndShare() {
+        func command(_ text: String) -> ShareBeaconCommand? {
+            URL(string: text).flatMap(ShareBeaconCommand.init(url:))
+        }
+        #expect(command("sharebeacon://unmount-all") == nil)
+        #expect(command("sharebeacon://remount-all") == nil)
+        #expect(command("sharebeacon://unmount?share=docs") == nil)
+        #expect(command("sharebeacon://unmount?host=NAS") == nil)
+        #expect(command("sharebeacon://unmount?host=&share=docs") == nil)
+        #expect(command("sharebeacon://unmount?host=NAS&share=%20") == nil)
+        #expect(command("sharebeacon://mount?share=") == nil)
     }
 
     @Test("a command target matches shares by name, share name or host")
@@ -650,6 +668,36 @@ struct ShareStatusTests {
         #expect(ShareBeaconCommand.matches(.share("DATA-SHARE"), share))
         #expect(ShareBeaconCommand.matches(.host("nas"), share))
         #expect(!ShareBeaconCommand.matches(.host("nas2"), share))
+        #expect(ShareBeaconCommand.matches(.exact(host: "nas", share: "Data"), share))
+        #expect(ShareBeaconCommand.matches(.exact(host: "NAS", share: "DATA-SHARE"), share))
+        #expect(!ShareBeaconCommand.matches(.exact(host: "nas2", share: "Data"), share))
+    }
+
+    @Test("a busy probe leaves the miss streak alone")
+    func busyProbeKeepsTheStreak() {
+        let policy = RepairPolicy()
+        #expect(policy.misses(after: .busy, current: 2) == 2)
+    }
+
+    @Test("a stuck probe counts as a miss and an answer clears the streak")
+    func probesCountTowardTheStreak() {
+        let policy = RepairPolicy()
+        #expect(policy.misses(after: .unresponsive, current: 0) == 1)
+        #expect(policy.misses(after: .unresponsive, current: 2) == 3)
+        let usage = VolumeUsage(totalBytes: 100, freeBytes: 50)
+        #expect(policy.misses(after: .usage(usage), current: 2) == 0)
+        #expect(policy.misses(after: .unavailable, current: 2) == 0)
+    }
+
+    @Test("three misses repair only a share that mounts itself")
+    func repairNeedsThreeMissesAndAutoMount() {
+        let policy = RepairPolicy()
+        #expect(!policy.shouldRepair(misses: 2, isEnabled: true, autoMount: true))
+        #expect(policy.shouldRepair(misses: 3, isEnabled: true, autoMount: true))
+        #expect(policy.shouldRepair(misses: 4, isEnabled: true, autoMount: true))
+        #expect(!policy.shouldRepair(misses: 3, isEnabled: false, autoMount: true))
+        #expect(!policy.shouldRepair(misses: 3, isEnabled: true, autoMount: false))
+        #expect(RepairPolicy(missesBeforeRepair: 1).shouldRepair(misses: 1, isEnabled: true, autoMount: true))
     }
 
     @Test("a probe of a local folder reports its usage")
