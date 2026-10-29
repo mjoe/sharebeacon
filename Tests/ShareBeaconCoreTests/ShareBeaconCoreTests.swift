@@ -575,6 +575,13 @@ struct ShareStatusTests {
         #expect(ByteFormatting.short(2_000_000_000) == "2G")
         #expect(ByteFormatting.rate(120_000_000) == "120MB/s")
         #expect(ByteFormatting.rate(500) == nil)
+        #expect(ByteFormatting.shortBits(125_000_000) == "1Gbit")
+        #expect(ByteFormatting.shortBits(12_000_000) == "96Mbit")
+        #expect(ByteFormatting.shortBits(2_000_000) == "16Mbit")
+        #expect(ByteFormatting.shortBits(1_000) == "8kbit")
+        #expect(ByteFormatting.shortBits(125) == "1kbit")
+        #expect(ByteFormatting.shortBits(124) == "0kbit")
+        #expect(ByteFormatting.shortBits(0) == "0kbit")
     }
 
     @Test("traffic is the counter delta per second and idles on a reset")
@@ -584,8 +591,8 @@ struct ShareStatusTests {
         let rate = TrafficRate(from: old, to: new, seconds: 2)
         #expect(rate.received == 120_000_000)
         #expect(rate.sent == 0)
-        #expect(rate.label == "↓120M ↑0B")
-        #expect(rate.detail == "120MB/s received")
+        #expect(rate.label == "↓960Mbit ↑0kbit")
+        #expect(rate.detail == "960Mbit/s received")
     }
 
     @Test("traffic of sessions on one host adds up")
@@ -595,14 +602,14 @@ struct ShareStatusTests {
         let sum = first.adding(second)
         #expect(sum.received == 1_500_000)
         #expect(sum.sent == 5_000)
-        #expect(sum.label == "↓1.5M ↑5K")
+        #expect(sum.label == "↓12Mbit ↑40kbit")
     }
 
     @Test("traffic below a kilobyte reads as idle")
     func trafficBelowThresholdIsIdle() {
         let rate = TrafficRate(received: 0, sent: 0)
         #expect(!rate.isActive)
-        #expect(rate.label == "↓0B ↑0B")
+        #expect(rate.label == "↓0kbit ↑0kbit")
         #expect(rate.detail == nil)
     }
 

@@ -466,6 +466,21 @@ enum ByteFormatting {
         guard bytesPerSecond >= 1_000 else { return nil }
         return short(UInt64(bytesPerSecond)) + "B/s"
     }
+
+    /// A bit rate in the units a link is rated in: kbit, Mbit, Gbit.
+    /// Never finer than one kbit, and idle reads as 0kbit.
+    static func shortBits(_ bytesPerSecond: Double) -> String {
+        let bits = bytesPerSecond * 8
+        let units: [(Double, String)] = [(1e9, "Gbit"), (1e6, "Mbit"), (1e3, "kbit")]
+        for (scale, suffix) in units where bits >= scale {
+            let scaled = bits / scale
+            let text = scaled < 10
+                ? String(format: "%.1f", scaled).replacingOccurrences(of: ".0", with: "")
+                : String(Int(scaled.rounded()))
+            return text + suffix
+        }
+        return "0kbit"
+    }
 }
 
 /// Bytes per second between two samples of the same session counters.
@@ -502,17 +517,18 @@ struct TrafficRate: Equatable, Sendable {
         TrafficRate(received: received + other.received, sent: sent + other.sent)
     }
 
-    /// Compact enough for a fixed slot in the host header. The slot keeps a
-    /// figure even while the share is idle, so the display does not blink out.
+    /// Compact enough for a fixed slot in the host header. Both directions
+    /// speak the link's units, kbit, Mbit, Gbit, and the slot keeps a figure
+    /// while idle, so the display does not blink out.
     var label: String {
-        "↓\(ByteFormatting.short(UInt64(received))) ↑\(ByteFormatting.short(UInt64(sent)))"
+        "↓\(ByteFormatting.shortBits(received)) ↑\(ByteFormatting.shortBits(sent))"
     }
 
     var detail: String? {
         guard isActive else { return nil }
         let parts = [
-            ByteFormatting.rate(received).map { "\($0) received" },
-            ByteFormatting.rate(sent).map { "\($0) sent" }
+            received >= 1_000 ? "\(ByteFormatting.shortBits(received))/s received" : nil,
+            sent >= 1_000 ? "\(ByteFormatting.shortBits(sent))/s sent" : nil
         ].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
