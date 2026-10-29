@@ -502,9 +502,10 @@ struct TrafficRate: Equatable, Sendable {
         TrafficRate(received: received + other.received, sent: sent + other.sent)
     }
 
-    /// Compact enough for a fixed slot in the host header.
-    var label: String? {
-        guard isActive else { return nil }
+    /// Compact enough for a fixed slot in the host header. The slot keeps a
+    /// figure even while the share is idle, so the display does not blink out.
+    var label: String {
+        guard isActive else { return "—" }
         var parts: [String] = []
         if received >= 1_000 {
             parts.append("↓\(ByteFormatting.short(UInt64(received)))")

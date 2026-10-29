@@ -297,12 +297,12 @@ private struct HostHeader: View {
             .buttonStyle(.plain)
 
             // The figure changes, the slot does not.
-            Text(traffic?.label ?? "")
+            Text(traffic?.label ?? "—")
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .frame(width: 96, alignment: .trailing)
-                .help(traffic?.detail ?? "")
+                .help(traffic?.detail ?? "No session traffic")
 
             if let link {
                 LinkBadge(link: link)

@@ -602,7 +602,7 @@ struct ShareStatusTests {
     func trafficBelowThresholdIsIdle() {
         let rate = TrafficRate(received: 999, sent: 0)
         #expect(!rate.isActive)
-        #expect(rate.label == nil)
+        #expect(rate.label == "—")
         #expect(rate.detail == nil)
     }
 
