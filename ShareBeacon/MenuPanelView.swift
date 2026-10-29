@@ -357,6 +357,7 @@ private struct ShareMenuRow: View {
     private var isMounted: Bool { state == .mounted }
     private var offCable: Bool { manager.isOnUnexpectedLink(share) }
     private var notResponding: Bool { manager.isUnresponsive(share) }
+    private var waitingForNetwork: Bool { isMounted && !manager.isNetworkAvailable }
     private var canMoveToCable: Bool { manager.canMoveToCable(share) }
 
     var body: some View {
@@ -423,6 +424,10 @@ private struct ShareMenuRow: View {
     @ViewBuilder
     private var statusIcon: some View {
         switch state {
+        case .mounted where waitingForNetwork:
+            Image(systemName: "wifi.slash")
+                .font(.callout)
+                .foregroundStyle(.orange)
         case .mounted where notResponding:
             Image(systemName: "hourglass")
                 .font(.callout)
@@ -455,6 +460,7 @@ private struct ShareMenuRow: View {
         switch state {
         case .failed(let message): return message
         case .mounted:
+            if waitingForNetwork { return "Waiting for network" }
             if notResponding { return "Not responding" }
             if canMoveToCable { return "Cable available" }
             return offCable ? "Expected a wired link" : "Mounted"
@@ -467,7 +473,7 @@ private struct ShareMenuRow: View {
     private var detailColor: Color {
         switch state {
         case .failed: return .red
-        case .mounted: return notResponding || canMoveToCable || offCable ? .orange : .secondary
+        case .mounted: return waitingForNetwork || notResponding || canMoveToCable || offCable ? .orange : .secondary
         default: return .secondary
         }
     }

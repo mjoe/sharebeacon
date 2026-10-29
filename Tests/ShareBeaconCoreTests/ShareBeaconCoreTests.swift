@@ -818,6 +818,56 @@ struct ShareStatusTests {
         #expect(!again.recovered)
     }
 
+    @Test("automatic status refreshes keep the minimum interval")
+    func statusRefreshPolicyThrottles() {
+        let policy = StatusRefreshPolicy(minimumInterval: 15)
+        let now = Date()
+        #expect(policy.delay(lastRefresh: now.addingTimeInterval(-16), now: now) == nil)
+        #expect(policy.delay(lastRefresh: now.addingTimeInterval(-15), now: now) == nil)
+        let partial = policy.delay(lastRefresh: now.addingTimeInterval(-8), now: now)
+        #expect(partial != nil && abs(partial! - 7) < 0.001)
+        #expect(policy.delay(lastRefresh: now, now: now) == 15)
+        // A clock that moved backwards must not cause a tight loop.
+        #expect(policy.delay(lastRefresh: now.addingTimeInterval(5), now: now) == 15)
+    }
+
+    @Test("a wake waits for a quiet path before reconnecting")
+    func wakePolicyWaitsForAStablePath() {
+        let policy = WakePolicy()
+        let now = Date()
+        #expect(!policy.isSettled(lastChange: now.addingTimeInterval(-9.9), now: now))
+        #expect(policy.isSettled(lastChange: now.addingTimeInterval(-10.1), now: now))
+        #expect(policy.isSettled(lastChange: now.addingTimeInterval(-30), now: now))
+        #expect(!policy.shouldGiveUp(waited: 39.9))
+        #expect(policy.shouldGiveUp(waited: 40))
+        #expect(policy.grace + policy.stableInterval < policy.maximumWait)
+    }
+
+    @Test("an unreachable endpoint pauses repairs without clearing the streak")
+    func healthPausesRepairsForUnreachableServer() {
+        var health = ShareHealth(policy: RepairPolicy(minimumWindow: 0))
+        let id = UUID()
+        let start = Date()
+        _ = health.record(.unresponsive, for: id, now: start, isEnabled: true, autoMount: true)
+        health.pauseRepairs(id, now: start, for: 60)
+        _ = health.record(
+            .unresponsive, for: id, now: start.addingTimeInterval(30),
+            isEnabled: true, autoMount: true
+        )
+        let paused = health.record(
+            .unresponsive, for: id, now: start.addingTimeInterval(59),
+            isEnabled: true, autoMount: true
+        )
+        #expect(!paused.shouldRepair)
+        #expect(health.isUnresponsive(id))
+        #expect(health.missStreak(id) == 3)
+        let resumed = health.record(
+            .unresponsive, for: id, now: start.addingTimeInterval(60),
+            isEnabled: true, autoMount: true
+        )
+        #expect(resumed.shouldRepair)
+    }
+
     @Test("traffic sums the sessions of every share on a host")
     func hostTrafficSumsShares() {
         let first = ShareConfiguration(

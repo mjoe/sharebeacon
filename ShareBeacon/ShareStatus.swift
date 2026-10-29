@@ -376,14 +376,19 @@ struct ShareHealth: Equatable, Sendable {
         return unresponsiveShares.remove(id) != nil
     }
 
+    /// Blocks repairs for a while without forgetting that the share is
+    /// unresponsive. Used when the server cannot be reached, so the next
+    /// attempt waits instead of probing the same dead endpoint every cycle.
+    mutating func pauseRepairs(_ id: UUID, now: Date = Date(), for duration: TimeInterval) {
+        repairsPausedUntil[id] = now.addingTimeInterval(duration)
+    }
+
     /// Forgets the share's health and starts the pause that follows a repair.
     /// The pause stays until someone asks for a mount by hand, so a share that
     /// keeps hanging cannot trigger one repair after another.
     mutating func noteRepair(_ id: UUID, now: Date = Date(), cooldown: TimeInterval) {
-        unresponsiveShares.remove(id)
-        missStreaks[id] = nil
-        firstMisses[id] = nil
-        repairsPausedUntil[id] = now.addingTimeInterval(cooldown)
+        clear(id)
+        pauseRepairs(id, now: now, for: cooldown)
     }
 
     /// A manual mount overrides the pause: the user just asked for it.
