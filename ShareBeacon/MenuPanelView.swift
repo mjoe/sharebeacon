@@ -298,7 +298,7 @@ private struct HostHeader: View {
 
             // The figure changes, the slot does not. The width holds the
             // widest reading, two gigabit figures such as "↓1.2Gbit ↑846Mbit".
-            Text(traffic?.label ?? "↓… ↑…")
+            Text(traffic?.label ?? "↓0kbit ↑0kbit")
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

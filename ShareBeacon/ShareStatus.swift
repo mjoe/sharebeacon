@@ -467,9 +467,10 @@ enum ByteFormatting {
         return short(UInt64(bytesPerSecond)) + "B/s"
     }
 
-    /// A bit rate in the units a link is rated in: kbit, Mbit, Gbit.
-    /// Never finer than one kbit. `idle` stands in for anything below it.
-    static func shortBits(_ bytesPerSecond: Double, idle: String = "0kbit") -> String {
+    /// A bit rate in the units a link is rated in: kbit, Mbit, Gbit. One
+    /// decimal below ten, never more. Below one kbit the kbit value keeps one
+    /// decimal, and a rate that reads as 0.0 reads as 0kbit.
+    static func shortBits(_ bytesPerSecond: Double) -> String {
         let bits = bytesPerSecond * 8
         let units: [(Double, String)] = [(1e9, "Gbit"), (1e6, "Mbit"), (1e3, "kbit")]
         for (scale, suffix) in units where bits >= scale {
@@ -479,7 +480,8 @@ enum ByteFormatting {
                 : String(Int(scaled.rounded()))
             return text + suffix
         }
-        return idle
+        let text = String(format: "%.1f", bits / 1_000).replacingOccurrences(of: ".0", with: "")
+        return text + "kbit"
     }
 }
 
@@ -518,10 +520,9 @@ struct TrafficRate: Equatable, Sendable {
     }
 
     /// Compact enough for a fixed slot in the host header. Both directions
-    /// speak the link's units, kbit, Mbit, Gbit. A direction without traffic
-    /// reads as an ellipsis, so the slot is always full without a fake zero.
+    /// speak the link's units, kbit, Mbit, Gbit, so the slot is always full.
     var label: String {
-        "↓\(ByteFormatting.shortBits(received, idle: "…")) ↑\(ByteFormatting.shortBits(sent, idle: "…"))"
+        "↓\(ByteFormatting.shortBits(received)) ↑\(ByteFormatting.shortBits(sent))"
     }
 
     var detail: String? {

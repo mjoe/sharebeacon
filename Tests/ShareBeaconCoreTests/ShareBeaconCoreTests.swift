@@ -576,11 +576,17 @@ struct ShareStatusTests {
         #expect(ByteFormatting.rate(120_000_000) == "120MB/s")
         #expect(ByteFormatting.rate(500) == nil)
         #expect(ByteFormatting.shortBits(125_000_000) == "1Gbit")
+        #expect(ByteFormatting.shortBits(150_000_000) == "1.2Gbit")
         #expect(ByteFormatting.shortBits(12_000_000) == "96Mbit")
+        #expect(ByteFormatting.shortBits(9_600_000) == "77Mbit")
         #expect(ByteFormatting.shortBits(2_000_000) == "16Mbit")
+        #expect(ByteFormatting.shortBits(125_000) == "1Mbit")
         #expect(ByteFormatting.shortBits(1_000) == "8kbit")
         #expect(ByteFormatting.shortBits(125) == "1kbit")
-        #expect(ByteFormatting.shortBits(124) == "0kbit")
+        #expect(ByteFormatting.shortBits(124) == "1kbit")
+        #expect(ByteFormatting.shortBits(62) == "0.5kbit")
+        #expect(ByteFormatting.shortBits(10) == "0.1kbit")
+        #expect(ByteFormatting.shortBits(4) == "0kbit")
         #expect(ByteFormatting.shortBits(0) == "0kbit")
     }
 
@@ -591,7 +597,7 @@ struct ShareStatusTests {
         let rate = TrafficRate(from: old, to: new, seconds: 2)
         #expect(rate.received == 120_000_000)
         #expect(rate.sent == 0)
-        #expect(rate.label == "↓960Mbit ↑…")
+        #expect(rate.label == "↓960Mbit ↑0kbit")
         #expect(rate.detail == "960Mbit/s received")
     }
 
@@ -609,8 +615,14 @@ struct ShareStatusTests {
     func trafficBelowThresholdIsIdle() {
         let rate = TrafficRate(received: 0, sent: 0)
         #expect(!rate.isActive)
-        #expect(rate.label == "↓… ↑…")
+        #expect(rate.label == "↓0kbit ↑0kbit")
         #expect(rate.detail == nil)
+    }
+
+    @Test("tiny traffic keeps one decimal before it becomes zero")
+    func tinyTrafficKeepsOneDecimal() {
+        let rate = TrafficRate(received: 62, sent: 0)
+        #expect(rate.label == "↓0.5kbit ↑0kbit")
     }
 
     @Test("a reader that misses its deadline returns and ends its child")
