@@ -100,7 +100,7 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.glass)
                     } footer: {
-                        Text("Mounts begin only after the configured SMB endpoint is reachable.")
+                        Text("Mounts begin only after the configured SMB endpoint is reachable. A network outage leaves mounted shares alone.")
                     }
                 }
                 .listStyle(.inset)

@@ -14,6 +14,7 @@ reconnects.
 - Serialized mount operations and endpoint readiness checks
 - Automatic recovery after login, network changes, sleep/wake, and disconnects
 - Sleep-aware: pauses all monitoring and mount activity while the Mac sleeps
+- Network-aware: pauses checks and repairs during an outage, then waits for a stable path
 - Credentials kept out of URLs, configuration, process arguments, and logs
 - User-owned mount points by default, without requiring administrator privileges; custom paths such as `/Volumes` are supported
 - Settings window with Shares, General, and Log tabs (live log with level filter)
@@ -61,9 +62,9 @@ including `/Volumes/<share-name>`, can be selected when needed.
 
 ## Versioning
 
-ShareBeacon uses a two-part product version, currently `1.0`.
-Release tags use the same format, for example `v1.0`. Release titles are
-`ShareBeacon <version>` (for example `ShareBeacon 1.0`). Build numbers are
+ShareBeacon uses a two-part product version, currently `1.1`.
+Release tags use the same format, for example `v1.1`. Release titles are
+`ShareBeacon <version>` (for example `ShareBeacon 1.1`). Build numbers are
 separate and increase for each CI build.
 
 The two-part rule is not cosmetic: `0.10` sorts before `0.9` as plain text, so
@@ -79,9 +80,11 @@ swift test
 
 Use `./scripts/build-release.sh --clean` for a clean derived-data build,
 `--skip-sign` when only an unsigned local artifact is needed, and `--notarize`
-to submit the release to Apple notarization and staple the ticket. The
-`--notarize` option requires `NOTARY_KEY_ID`, `NOTARY_ISSUER`, and
-`NOTARY_KEY_PATH`. Release ZIPs include a SHA-256 checksum.
+to submit the release to Apple notarization, then staple and validate the
+ticket. Notarization accepts either `NOTARY_KEY_ID`, `NOTARY_ISSUER`, and
+`NOTARY_KEY_PATH` for an App Store Connect API key, or `NOTARY_APPLE_ID`,
+`NOTARY_PASSWORD`, and `NOTARY_TEAM_ID` for an Apple ID with an app-specific
+password. Release ZIPs include a SHA-256 checksum.
 
 The release build is universal. When a Developer ID Application certificate is
 installed in the login keychain, `build-release.sh` signs with it (with

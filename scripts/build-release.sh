@@ -12,8 +12,9 @@ Options:
   --build-number NUMBER   Override the generated build number
   -h, --help              Show this help
 
-Notarization requires the environment variables NOTARY_KEY_ID, NOTARY_ISSUER,
-and NOTARY_KEY_PATH pointing to an App Store Connect API key.
+Notarization uses either an App Store Connect API key or an Apple ID:
+  NOTARY_KEY_ID, NOTARY_ISSUER, NOTARY_KEY_PATH
+  or NOTARY_APPLE_ID, NOTARY_PASSWORD, NOTARY_TEAM_ID
 EOF
 }
 
@@ -120,15 +121,32 @@ xcrun ditto -c -k --keepParent "${APP_PATH}" "${ZIP_PATH}"
 shasum -a 256 "${ZIP_PATH}" > "${CHECKSUM_PATH}"
 
 if ((NOTARIZE)); then
-  : "${NOTARY_KEY_ID:?set NOTARY_KEY_ID}"
-  : "${NOTARY_ISSUER:?set NOTARY_ISSUER}"
-  : "${NOTARY_KEY_PATH:?set NOTARY_KEY_PATH}"
-  xcrun notarytool submit "${ZIP_PATH}" \
-    --key-id "${NOTARY_KEY_ID}" \
-    --issuer "${NOTARY_ISSUER}" \
-    --key "${NOTARY_KEY_PATH}" \
-    --wait
+  if [[ -n "${NOTARY_KEY_ID:-}" ]]; then
+    : "${NOTARY_ISSUER:?set NOTARY_ISSUER}"
+    : "${NOTARY_KEY_PATH:?set NOTARY_KEY_PATH}"
+    xcrun notarytool submit "${ZIP_PATH}" \
+      --key-id "${NOTARY_KEY_ID}" \
+      --issuer "${NOTARY_ISSUER}" \
+      --key "${NOTARY_KEY_PATH}" \
+      --wait
+  elif [[ -n "${NOTARY_APPLE_ID:-}" || -n "${NOTARY_PASSWORD:-}" || -n "${NOTARY_TEAM_ID:-}" ]]; then
+    : "${NOTARY_APPLE_ID:?set NOTARY_APPLE_ID}"
+    : "${NOTARY_PASSWORD:?set NOTARY_PASSWORD}"
+    : "${NOTARY_TEAM_ID:?set NOTARY_TEAM_ID}"
+    xcrun notarytool submit "${ZIP_PATH}" \
+      --apple-id "${NOTARY_APPLE_ID}" \
+      --password "${NOTARY_PASSWORD}" \
+      --team-id "${NOTARY_TEAM_ID}" \
+      --wait
+  else
+    printf '%s\n' \
+      "Set NOTARY_KEY_ID, NOTARY_ISSUER and NOTARY_KEY_PATH, or NOTARY_APPLE_ID, NOTARY_PASSWORD and NOTARY_TEAM_ID." >&2
+    exit 2
+  fi
+
   xcrun stapler staple "${APP_PATH}"
+  xcrun stapler validate "${APP_PATH}"
+  spctl --assess --type execute --verbose=2 "${APP_PATH}"
   rm -f "${ZIP_PATH}" "${CHECKSUM_PATH}"
   xcrun ditto -c -k --keepParent "${APP_PATH}" "${ZIP_PATH}"
   shasum -a 256 "${ZIP_PATH}" > "${CHECKSUM_PATH}"
