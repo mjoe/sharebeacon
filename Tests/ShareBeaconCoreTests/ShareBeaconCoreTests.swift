@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import ShareBeaconCore
 
@@ -686,7 +687,69 @@ struct ShareStatusTests {
         #expect(policy.misses(after: .unresponsive, current: 2) == 3)
         let usage = VolumeUsage(totalBytes: 100, freeBytes: 50)
         #expect(policy.misses(after: .usage(usage), current: 2) == 0)
-        #expect(policy.misses(after: .unavailable, current: 2) == 2)
+        #expect(policy.misses(after: .unavailable, current: 2) == 3)
+    }
+
+    @Test("a volume whose statfs keeps failing is repaired")
+    func healthRepairsAfterStatfsFails() {
+        var health = ShareHealth(policy: RepairPolicy(minimumWindow: 0))
+        let id = UUID()
+        let start = Date()
+        var change = health.record(
+            .unavailable, for: id, now: start,
+            isEnabled: true, autoMount: true
+        )
+        #expect(change.becameUnresponsive)
+        #expect(!change.shouldRepair)
+        _ = health.record(
+            .unavailable, for: id, now: start.addingTimeInterval(1),
+            isEnabled: true, autoMount: true
+        )
+        change = health.record(
+            .unavailable, for: id, now: start.addingTimeInterval(2),
+            isEnabled: true, autoMount: true
+        )
+        #expect(change.shouldRepair)
+        #expect(health.missStreak(id) == 3)
+    }
+
+    @Test("session samples are reused within their lifetime")
+    func sessionSamplerReusesFreshSamples() async {
+        let reads = Mutex(0)
+        let sampler = SMBSessionSampler { _ in
+            reads.withLock { $0 += 1 }
+            return []
+        }
+        let first = await sampler.sample(maxAge: .seconds(3), timeout: 1)
+        let second = await sampler.sample(maxAge: .seconds(3), timeout: 1)
+        #expect(first.at == second.at)
+        #expect(reads.withLock { $0 } == 1)
+    }
+
+    @Test("an old session sample is read again")
+    func sessionSamplerReadsAfterExpiry() async {
+        let reads = Mutex(0)
+        let sampler = SMBSessionSampler { _ in
+            reads.withLock { $0 += 1 }
+            return []
+        }
+        _ = await sampler.sample(maxAge: .zero, timeout: 1)
+        _ = await sampler.sample(maxAge: .zero, timeout: 1)
+        #expect(reads.withLock { $0 } == 2)
+    }
+
+    @Test("concurrent session reads share one command")
+    func sessionSamplerCoalescesConcurrentReads() async {
+        let reads = Mutex(0)
+        let sampler = SMBSessionSampler { _ in
+            Thread.sleep(forTimeInterval: 0.05)
+            reads.withLock { $0 += 1 }
+            return []
+        }
+        async let first = sampler.sample(maxAge: .zero, timeout: 1)
+        async let second = sampler.sample(maxAge: .zero, timeout: 1)
+        _ = await (first, second)
+        #expect(reads.withLock { $0 } == 1)
     }
 
     @Test("three misses over the window repair only a share that mounts itself")
@@ -780,7 +843,6 @@ struct ShareStatusTests {
         let id = UUID()
         _ = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
         _ = health.record(.busy, for: id, isEnabled: true, autoMount: true)
-        _ = health.record(.unavailable, for: id, isEnabled: true, autoMount: true)
         _ = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
         #expect(health.missStreak(id) == 2)
     }

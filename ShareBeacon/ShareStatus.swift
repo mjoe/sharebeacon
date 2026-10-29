@@ -153,6 +153,47 @@ enum SMBSessionReader {
     }
 }
 
+/// Shares session reads between the status refresh and the traffic sampler.
+/// While the panel is open the sampler reads every two seconds, and the status
+/// refresh can reuse that answer instead of starting a second smbutil on the
+/// same servers. Concurrent callers also share one read.
+actor SMBSessionSampler {
+    typealias Reader = @Sendable (TimeInterval) -> [SMBSession]
+
+    struct Sample: Sendable {
+        let sessions: [SMBSession]
+        /// When the read finished. Rates between two samples use this.
+        let at: ContinuousClock.Instant
+    }
+
+    private let read: Reader
+    private var cached: Sample?
+    private var inFlight: Task<Sample, Never>?
+
+    init(read: @escaping Reader = { SMBSessionReader.read(timeout: $0) }) {
+        self.read = read
+    }
+
+    /// Returns a sample no older than `maxAge`, reading one if needed.
+    func sample(maxAge: Duration, timeout: TimeInterval) async -> Sample {
+        if let cached, ContinuousClock.now - cached.at < maxAge {
+            return cached
+        }
+        if let inFlight {
+            return await inFlight.value
+        }
+        let read = self.read
+        let task = Task<Sample, Never>.detached {
+            Sample(sessions: read(timeout), at: ContinuousClock.now)
+        }
+        inFlight = task
+        let sample = await task.value
+        inFlight = nil
+        cached = sample
+        return sample
+    }
+}
+
 // MARK: - Volume usage
 
 struct VolumeUsage: Equatable, Sendable {
@@ -274,9 +315,9 @@ struct RepairPolicy: Equatable, Sendable {
     /// still did not answer.
     func misses(after probe: VolumeProbe, current: Int) -> Int {
         switch probe {
-        case .unresponsive:
+        case .unresponsive, .unavailable:
             return current + 1
-        case .busy, .unavailable:
+        case .busy:
             return current
         case .usage:
             return 0
@@ -344,7 +385,7 @@ struct ShareHealth: Equatable, Sendable {
     ) -> ShareHealthChange {
         var change = ShareHealthChange()
         switch probe {
-        case .unresponsive:
+        case .unresponsive, .unavailable:
             change.becameUnresponsive = unresponsiveShares.insert(id).inserted
             if firstMisses[id] == nil {
                 firstMisses[id] = now
@@ -362,7 +403,7 @@ struct ShareHealth: Equatable, Sendable {
             change.recovered = unresponsiveShares.remove(id) != nil
             missStreaks[id] = nil
             firstMisses[id] = nil
-        case .busy, .unavailable:
+        case .busy:
             break
         }
         return change

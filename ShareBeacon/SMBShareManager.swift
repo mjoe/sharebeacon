@@ -79,6 +79,7 @@ final class SMBShareManager: NSObject {
     @ObservationIgnored private let mounter: ShareMounting
     @ObservationIgnored private let finderSidebarRepairer: FinderSidebarRepairing
     @ObservationIgnored private let linkResolver: NetworkLinkResolving
+    @ObservationIgnored private let sessionSampler = SMBSessionSampler()
     @ObservationIgnored private let defaults: UserDefaults
     private let saveKey = "shareBeaconShares"
     private let favoriteKey = "shareBeaconRestoresFavorites"
@@ -318,9 +319,12 @@ final class SMBShareManager: NSObject {
             .filter { state(for: $0) == .mounted }
             .map { (id: $0.id, host: $0.host, path: mountPath(for: $0)) }
         let resolver = linkResolver
+        let sampler = sessionSampler
         statusTask = Task { [weak self] in
             let report = await Task.detached {
-                let sessions = SMBSessionReader.read()
+                let sessions = await sampler
+                    .sample(maxAge: .seconds(3), timeout: 5)
+                    .sessions
                 let byPath = Dictionary(
                     sessions.map { (URL(fileURLWithPath: $0.mountPath).standardizedFileURL.path, $0) },
                     uniquingKeysWith: { first, _ in first }
@@ -394,7 +398,10 @@ final class SMBShareManager: NSObject {
                 // A probe already runs for this share. That says nothing about
                 // its health, so the streak stays where it is.
                 break
-            case .unresponsive:
+            case .unresponsive, .unavailable:
+                if entry.probe == .unavailable {
+                    usages[share.id] = nil
+                }
                 let change = health.record(
                     entry.probe,
                     for: share.id,
@@ -408,8 +415,6 @@ final class SMBShareManager: NSObject {
                 if change.shouldRepair {
                     stale.append(share)
                 }
-            case .unavailable:
-                usages[share.id] = nil
             }
         }
         for share in stale {
@@ -560,11 +565,13 @@ final class SMBShareManager: NSObject {
         trafficSamplers += 1
         guard trafficTask == nil else { return }
         trafficTask = Task { [weak self] in
+            guard let sampler = self?.sessionSampler else { return }
             var previous: (sessions: [String: SMBSession], at: ContinuousClock.Instant)?
             while !Task.isCancelled {
-                let sessions = await Task.detached { SMBSessionReader.read(timeout: 3) }.value
-                let now = ContinuousClock.now
+                let sample = await sampler.sample(maxAge: .seconds(1), timeout: 3)
                 guard let self, !Task.isCancelled else { return }
+                let sessions = sample.sessions
+                let now = sample.at
                 let byPath = Dictionary(
                     sessions.map { (URL(fileURLWithPath: $0.mountPath).standardizedFileURL.path, $0) },
                     uniquingKeysWith: { first, _ in first }
