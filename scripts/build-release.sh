@@ -118,7 +118,9 @@ ARCHITECTURES="$(xcrun lipo -archs "${APP_PATH}/Contents/MacOS/ShareBeacon")"
 }
 
 xcrun ditto -c -k --keepParent "${APP_PATH}" "${ZIP_PATH}"
-shasum -a 256 "${ZIP_PATH}" > "${CHECKSUM_PATH}"
+shasum -a 256 "${ZIP_PATH}" \
+  | awk -v name="$(basename "${ZIP_PATH}")" '{ print $1 "  " name }' \
+  > "${CHECKSUM_PATH}"
 
 if ((NOTARIZE)); then
   if [[ -n "${NOTARY_KEY_ID:-}" ]]; then
@@ -149,7 +151,9 @@ if ((NOTARIZE)); then
   spctl --assess --type execute --verbose=2 "${APP_PATH}"
   rm -f "${ZIP_PATH}" "${CHECKSUM_PATH}"
   xcrun ditto -c -k --keepParent "${APP_PATH}" "${ZIP_PATH}"
-  shasum -a 256 "${ZIP_PATH}" > "${CHECKSUM_PATH}"
+  shasum -a 256 "${ZIP_PATH}" \
+  | awk -v name="$(basename "${ZIP_PATH}")" '{ print $1 "  " name }' \
+  > "${CHECKSUM_PATH}"
 fi
 
 printf 'Built %s\n' "${ZIP_PATH}"
