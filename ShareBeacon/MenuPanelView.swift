@@ -297,7 +297,7 @@ private struct HostHeader: View {
             .buttonStyle(.plain)
 
             // The figure changes, the slot does not.
-            Text(traffic?.label ?? "—")
+            Text(traffic?.label ?? "0B/s")
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
