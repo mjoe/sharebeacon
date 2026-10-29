@@ -5,7 +5,12 @@ import SwiftUI
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let shareManager = SMBShareManager()
+    let updateChecker = UpdateChecker()
     var showSettings: ((SettingsTab) -> Void)?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        Task { await updateChecker.checkIfNeeded() }
+    }
 
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
@@ -44,6 +49,7 @@ struct ShareBeaconApp: App {
         MenuBarExtra("ShareBeacon", systemImage: menuBarSymbol) {
             MenuPanelView()
                 .environment(shareManager)
+                .environment(appDelegate.updateChecker)
                 .background(SettingsOpenerBridge(appDelegate: appDelegate))
         }
         .menuBarExtraStyle(.window)
@@ -51,6 +57,7 @@ struct ShareBeaconApp: App {
         Settings {
             SettingsView()
                 .environment(shareManager)
+                .environment(appDelegate.updateChecker)
         }
         .windowResizability(.contentMinSize)
     }

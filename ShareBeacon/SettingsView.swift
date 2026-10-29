@@ -10,6 +10,7 @@ enum SettingsTab: String {
 
 struct SettingsView: View {
     @Environment(SMBShareManager.self) private var manager
+    @Environment(UpdateChecker.self) private var updateChecker
     @AppStorage("selectedSettingsTab") private var selectedTab = SettingsTab.shares.rawValue
     @State private var selection: ShareConfiguration.ID?
     @State private var editedShare: ShareConfiguration?
@@ -35,7 +36,10 @@ struct SettingsView: View {
         }
         .tabViewStyle(.tabBarOnly)
         .frame(minWidth: 640, minHeight: 520)
-        .onAppear(perform: consumeAddShareRequest)
+        .onAppear {
+            consumeAddShareRequest()
+            Task { await updateChecker.checkIfNeeded() }
+        }
         .onChange(of: addShareRequested) { _, _ in consumeAddShareRequest() }
     }
 
@@ -194,9 +198,41 @@ struct SettingsView: View {
                 LabeledContent("Version") {
                     Text(AppMetadata.versionLabel)
                 }
+                LabeledContent("Updates") {
+                    HStack(spacing: 8) {
+                        if let update = updateChecker.availableUpdate {
+                            Link(
+                                "Version \(update.version) available",
+                                destination: update.releaseURL
+                            )
+                        } else {
+                            Text(updateStatusText)
+                                .foregroundStyle(.secondary)
+                                .help(updateChecker.failureMessage ?? "")
+                        }
+                        Button {
+                            Task { await updateChecker.check() }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(updateChecker.isChecking)
+                        .help("Check for Updates")
+                    }
+                }
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var updateStatusText: String {
+        switch updateChecker.state {
+        case .idle: return "Not checked"
+        case .checking: return "Checking..."
+        case .upToDate: return "Up to date"
+        case .failed: return "Could not check"
+        case .available: return ""
+        }
     }
 
     private var restoresFavoritesBinding: Binding<Bool> {

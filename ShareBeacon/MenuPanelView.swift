@@ -5,6 +5,7 @@ import SwiftUI
 /// the link it runs over, and the app actions in a footer.
 struct MenuPanelView: View {
     @Environment(SMBShareManager.self) private var manager
+    @Environment(UpdateChecker.self) private var updateChecker
     @Environment(\.openSettings) private var openSettings
     @AppStorage("selectedSettingsTab") private var selectedSettingsTab = SettingsTab.shares.rawValue
     @AppStorage("menuCollapsedHosts") private var collapsedHostsStorage = ""
@@ -56,6 +57,7 @@ struct MenuPanelView: View {
         .onAppear {
             manager.startPanelRefresh()
             manager.startTrafficSampling()
+            Task { await updateChecker.checkIfNeeded() }
         }
         .onDisappear {
             manager.stopPanelRefresh()
@@ -123,9 +125,25 @@ struct MenuPanelView: View {
                 )
             }
             Spacer()
+            if let update = updateChecker.availableUpdate {
+                Button {
+                    NSWorkspace.shared.open(update.releaseURL)
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.down.circle")
+                        Text("Update \(update.version)")
+                            .monospacedDigit()
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.caption2)
+                .foregroundStyle(.orange)
+                .help("ShareBeacon \(update.version) is available")
+            }
             Text(AppMetadata.versionLabel)
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
+                .lineLimit(1)
             FooterButton(title: "Quit", symbol: "power") {
                 NSApplication.shared.terminate(nil)
             }
