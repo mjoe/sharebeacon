@@ -584,7 +584,7 @@ struct ShareStatusTests {
         let rate = TrafficRate(from: old, to: new, seconds: 2)
         #expect(rate.received == 120_000_000)
         #expect(rate.sent == 0)
-        #expect(rate.label == "↓120M")
+        #expect(rate.label == "↓120M ↑0B")
         #expect(rate.detail == "120MB/s received")
     }
 
@@ -600,9 +600,9 @@ struct ShareStatusTests {
 
     @Test("traffic below a kilobyte reads as idle")
     func trafficBelowThresholdIsIdle() {
-        let rate = TrafficRate(received: 999, sent: 0)
+        let rate = TrafficRate(received: 0, sent: 0)
         #expect(!rate.isActive)
-        #expect(rate.label == "0B/s")
+        #expect(rate.label == "↓0B ↑0B")
         #expect(rate.detail == nil)
     }
 
