@@ -468,9 +468,10 @@ enum ByteFormatting {
     }
 
     /// A bit rate in the units a link is rated in: kbit, Mbit, Gbit. One
-    /// decimal below ten, never more. Below one kbit the kbit value keeps one
-    /// decimal, and a rate that reads as 0.0 reads as 0kbit.
+    /// decimal below ten, never more. No traffic at all reads as an ellipsis,
+    /// while a rate that is real but rounds to 0.0 reads as 0kbit.
     static func shortBits(_ bytesPerSecond: Double) -> String {
+        guard bytesPerSecond > 0 else { return "…" }
         let bits = bytesPerSecond * 8
         let units: [(Double, String)] = [(1e9, "Gbit"), (1e6, "Mbit"), (1e3, "kbit")]
         for (scale, suffix) in units where bits >= scale {
@@ -520,7 +521,8 @@ struct TrafficRate: Equatable, Sendable {
     }
 
     /// Compact enough for a fixed slot in the host header. Both directions
-    /// speak the link's units, kbit, Mbit, Gbit, so the slot is always full.
+    /// speak the link's units, kbit, Mbit, Gbit. A direction without any
+    /// traffic reads as an ellipsis, so the slot is full without a fake zero.
     var label: String {
         "↓\(ByteFormatting.shortBits(received)) ↑\(ByteFormatting.shortBits(sent))"
     }
