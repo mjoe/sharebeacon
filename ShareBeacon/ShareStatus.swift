@@ -154,7 +154,7 @@ enum SMBSessionReader {
 }
 
 /// Shares session reads between the status refresh and the traffic sampler.
-/// While the panel is open the sampler reads every two seconds, and the status
+/// While the panel is open the sampler reads every second, and the status
 /// refresh can reuse that answer instead of starting a second smbutil on the
 /// same servers. Concurrent callers also share one read.
 actor SMBSessionSampler {

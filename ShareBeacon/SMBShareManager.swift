@@ -558,7 +558,7 @@ final class SMBShareManager: NSObject {
 
     // MARK: Traffic
 
-    /// Samples session traffic every two seconds while the menu panel is open.
+    /// Samples session traffic every second while the menu panel is open.
     /// Rates are summed per host, because two shares on one server can be two
     /// sessions with their own counters.
     func startTrafficSampling() {
@@ -592,7 +592,7 @@ final class SMBShareManager: NSObject {
                     traffic = [:]
                 }
                 previous = (byPath, now)
-                try? await Task.sleep(for: .seconds(2))
+                try? await Task.sleep(for: .seconds(1))
             }
         }
     }
