@@ -154,7 +154,7 @@ enum SMBSessionReader {
 }
 
 /// Shares session reads between the status refresh and the traffic sampler.
-/// While the panel is open the sampler reads every second, and the status
+/// While the panel is open the sampler reads every two seconds, and the status
 /// refresh can reuse that answer instead of starting a second smbutil on the
 /// same servers. Concurrent callers also share one read.
 actor SMBSessionSampler {
@@ -468,8 +468,8 @@ enum ByteFormatting {
     }
 
     /// A bit rate in the units a link is rated in: kbit, Mbit, Gbit.
-    /// Never finer than one kbit, and idle reads as 0kbit.
-    static func shortBits(_ bytesPerSecond: Double) -> String {
+    /// Never finer than one kbit. `idle` stands in for anything below it.
+    static func shortBits(_ bytesPerSecond: Double, idle: String = "0kbit") -> String {
         let bits = bytesPerSecond * 8
         let units: [(Double, String)] = [(1e9, "Gbit"), (1e6, "Mbit"), (1e3, "kbit")]
         for (scale, suffix) in units where bits >= scale {
@@ -479,7 +479,7 @@ enum ByteFormatting {
                 : String(Int(scaled.rounded()))
             return text + suffix
         }
-        return "0kbit"
+        return idle
     }
 }
 
@@ -518,10 +518,10 @@ struct TrafficRate: Equatable, Sendable {
     }
 
     /// Compact enough for a fixed slot in the host header. Both directions
-    /// speak the link's units, kbit, Mbit, Gbit, and the slot keeps a figure
-    /// while idle, so the display does not blink out.
+    /// speak the link's units, kbit, Mbit, Gbit. A direction without traffic
+    /// reads as an ellipsis, so the slot is always full without a fake zero.
     var label: String {
-        "↓\(ByteFormatting.shortBits(received)) ↑\(ByteFormatting.shortBits(sent))"
+        "↓\(ByteFormatting.shortBits(received, idle: "…")) ↑\(ByteFormatting.shortBits(sent, idle: "…"))"
     }
 
     var detail: String? {
