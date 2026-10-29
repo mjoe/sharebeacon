@@ -222,6 +222,13 @@ enum VolumeProber {
         return result.withLock { $0 } ?? .unavailable
     }
 
+    /// Forgets that a path missed its deadline. The running probe keeps its
+    /// claim, so the next few probes read as busy instead of as fresh misses.
+    /// Used after a repair, when the old probe no longer speaks for the share.
+    static func clearStuck(path: String) {
+        stuck.withLock { _ = $0.remove(path) }
+    }
+
     private static let inFlight = Mutex(Set<String>())
     /// Paths whose running probe has already missed its deadline.
     private static let stuck = Mutex(Set<String>())
@@ -233,11 +240,33 @@ struct RepairPolicy: Equatable, Sendable {
     /// Three misses in a row. One slow answer is not a hang, and a repair
     /// costs a reconnect, so the threshold stays above one.
     static let defaultMissesBeforeRepair = 3
+    /// A share has to stay unresponsive this long before a repair. The menu
+    /// panel probes every ten seconds, and a Wi-Fi roam or a sleeping disk can
+    /// take half a minute; repairing into that window unmounts a share that
+    /// was about to answer again.
+    static let defaultMinimumWindow: TimeInterval = 120
+    /// After a repair the share is left alone for a while, so a share that
+    /// never comes back cannot start a repair loop.
+    static let defaultRepairCooldown: TimeInterval = 600
+    /// A repair that failed because the volume was busy means a copy is
+    /// running. That deserves a longer pause.
+    static let defaultBusyCooldown: TimeInterval = 900
 
     let missesBeforeRepair: Int
+    let minimumWindow: TimeInterval
+    let repairCooldown: TimeInterval
+    let busyCooldown: TimeInterval
 
-    init(missesBeforeRepair: Int = RepairPolicy.defaultMissesBeforeRepair) {
+    init(
+        missesBeforeRepair: Int = RepairPolicy.defaultMissesBeforeRepair,
+        minimumWindow: TimeInterval = RepairPolicy.defaultMinimumWindow,
+        repairCooldown: TimeInterval = RepairPolicy.defaultRepairCooldown,
+        busyCooldown: TimeInterval = RepairPolicy.defaultBusyCooldown
+    ) {
         self.missesBeforeRepair = missesBeforeRepair
+        self.minimumWindow = minimumWindow
+        self.repairCooldown = repairCooldown
+        self.busyCooldown = busyCooldown
     }
 
     /// A probe that found the volume busy says nothing about its health, so it
@@ -255,9 +284,18 @@ struct RepairPolicy: Equatable, Sendable {
     }
 
     /// Only shares that mount themselves are repaired. A manual mount belongs
-    /// to the user, who may be in the middle of a copy.
-    func shouldRepair(misses: Int, isEnabled: Bool, autoMount: Bool) -> Bool {
-        isEnabled && autoMount && misses >= missesBeforeRepair
+    /// to the user, who may be in the middle of a copy. The streak alone is
+    /// not enough: the first miss also has to lie `minimumWindow` in the past.
+    func shouldRepair(
+        misses: Int,
+        firstMiss: Date?,
+        now: Date,
+        isEnabled: Bool,
+        autoMount: Bool
+    ) -> Bool {
+        guard isEnabled, autoMount, misses >= missesBeforeRepair else { return false }
+        guard let firstMiss else { return false }
+        return now.timeIntervalSince(firstMiss) >= minimumWindow
     }
 }
 
@@ -276,6 +314,8 @@ struct ShareHealth: Equatable, Sendable {
     let policy: RepairPolicy
     private var unresponsiveShares: Set<UUID> = []
     private var missStreaks: [UUID: Int] = [:]
+    private var firstMisses: [UUID: Date] = [:]
+    private var repairsPausedUntil: [UUID: Date] = [:]
 
     init(policy: RepairPolicy = RepairPolicy()) {
         self.policy = policy
@@ -289,9 +329,16 @@ struct ShareHealth: Equatable, Sendable {
         missStreaks[id] ?? 0
     }
 
+    /// False while a share waits out the pause after a repair.
+    func canRepair(_ id: UUID, now: Date = Date()) -> Bool {
+        guard let pause = repairsPausedUntil[id] else { return true }
+        return now >= pause
+    }
+
     mutating func record(
         _ probe: VolumeProbe,
         for id: UUID,
+        now: Date = Date(),
         isEnabled: Bool,
         autoMount: Bool
     ) -> ShareHealthChange {
@@ -299,16 +346,22 @@ struct ShareHealth: Equatable, Sendable {
         switch probe {
         case .unresponsive:
             change.becameUnresponsive = unresponsiveShares.insert(id).inserted
+            if firstMisses[id] == nil {
+                firstMisses[id] = now
+            }
             let streak = policy.misses(after: probe, current: missStreaks[id] ?? 0)
             missStreaks[id] = streak
-            change.shouldRepair = policy.shouldRepair(
+            change.shouldRepair = canRepair(id, now: now) && policy.shouldRepair(
                 misses: streak,
+                firstMiss: firstMisses[id],
+                now: now,
                 isEnabled: isEnabled,
                 autoMount: autoMount
             )
         case .usage:
             change.recovered = unresponsiveShares.remove(id) != nil
             missStreaks[id] = nil
+            firstMisses[id] = nil
         case .busy, .unavailable:
             break
         }
@@ -319,12 +372,29 @@ struct ShareHealth: Equatable, Sendable {
     /// activity clears both the mark and the streak.
     mutating func noteActivity(_ id: UUID) -> Bool {
         missStreaks[id] = nil
+        firstMisses[id] = nil
         return unresponsiveShares.remove(id) != nil
+    }
+
+    /// Forgets the share's health and starts the pause that follows a repair.
+    /// The pause stays until someone asks for a mount by hand, so a share that
+    /// keeps hanging cannot trigger one repair after another.
+    mutating func noteRepair(_ id: UUID, now: Date = Date(), cooldown: TimeInterval) {
+        unresponsiveShares.remove(id)
+        missStreaks[id] = nil
+        firstMisses[id] = nil
+        repairsPausedUntil[id] = now.addingTimeInterval(cooldown)
+    }
+
+    /// A manual mount overrides the pause: the user just asked for it.
+    mutating func resetCooldown(_ id: UUID) {
+        repairsPausedUntil[id] = nil
     }
 
     mutating func clear(_ id: UUID) {
         unresponsiveShares.remove(id)
         missStreaks[id] = nil
+        firstMisses[id] = nil
     }
 }
 

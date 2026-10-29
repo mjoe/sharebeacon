@@ -689,30 +689,75 @@ struct ShareStatusTests {
         #expect(policy.misses(after: .unavailable, current: 2) == 2)
     }
 
-    @Test("three misses repair only a share that mounts itself")
+    @Test("three misses over the window repair only a share that mounts itself")
     func repairNeedsThreeMissesAndAutoMount() {
         let policy = RepairPolicy()
-        #expect(!policy.shouldRepair(misses: 2, isEnabled: true, autoMount: true))
-        #expect(policy.shouldRepair(misses: 3, isEnabled: true, autoMount: true))
-        #expect(policy.shouldRepair(misses: 4, isEnabled: true, autoMount: true))
-        #expect(!policy.shouldRepair(misses: 3, isEnabled: false, autoMount: true))
-        #expect(!policy.shouldRepair(misses: 3, isEnabled: true, autoMount: false))
-        #expect(RepairPolicy(missesBeforeRepair: 1).shouldRepair(misses: 1, isEnabled: true, autoMount: true))
+        let now = Date()
+        let old = now.addingTimeInterval(-300)
+        let recent = now.addingTimeInterval(-30)
+        #expect(!policy.shouldRepair(misses: 2, firstMiss: old, now: now, isEnabled: true, autoMount: true))
+        #expect(policy.shouldRepair(misses: 3, firstMiss: old, now: now, isEnabled: true, autoMount: true))
+        #expect(policy.shouldRepair(misses: 4, firstMiss: old, now: now, isEnabled: true, autoMount: true))
+        #expect(!policy.shouldRepair(misses: 3, firstMiss: old, now: now, isEnabled: false, autoMount: true))
+        #expect(!policy.shouldRepair(misses: 3, firstMiss: old, now: now, isEnabled: true, autoMount: false))
+        #expect(!policy.shouldRepair(misses: 3, firstMiss: nil, now: now, isEnabled: true, autoMount: true))
+        // Three misses within half a minute are a slow share, not a hang.
+        #expect(!policy.shouldRepair(misses: 3, firstMiss: recent, now: now, isEnabled: true, autoMount: true))
+        #expect(RepairPolicy(missesBeforeRepair: 1, minimumWindow: 0).shouldRepair(
+            misses: 1, firstMiss: now, now: now, isEnabled: true, autoMount: true
+        ))
     }
 
-    @Test("a share is marked once and repaired on the third miss")
+    @Test("a share is marked once and repaired on the third miss after the window")
     func healthRepairsOnTheThirdMiss() {
         var health = ShareHealth()
         let id = UUID()
-        var change = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        let start = Date()
+        var change = health.record(.unresponsive, for: id, now: start, isEnabled: true, autoMount: true)
         #expect(change.becameUnresponsive)
         #expect(!change.shouldRepair)
-        _ = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
-        change = health.record(.unresponsive, for: id, isEnabled: true, autoMount: true)
+        _ = health.record(
+            .unresponsive, for: id, now: start.addingTimeInterval(10),
+            isEnabled: true, autoMount: true
+        )
+        change = health.record(
+            .unresponsive, for: id, now: start.addingTimeInterval(120),
+            isEnabled: true, autoMount: true
+        )
         #expect(!change.becameUnresponsive)
         #expect(change.shouldRepair)
         #expect(health.isUnresponsive(id))
         #expect(health.missStreak(id) == 3)
+    }
+
+    @Test("a repair pauses further repairs for the cooldown")
+    func healthHonorsTheRepairCooldown() {
+        var health = ShareHealth()
+        let id = UUID()
+        let start = Date()
+        health.noteRepair(id, now: start, cooldown: health.policy.repairCooldown)
+        #expect(!health.canRepair(id, now: start.addingTimeInterval(599)))
+        #expect(health.canRepair(id, now: start.addingTimeInterval(600)))
+
+        var change = ShareHealthChange()
+        for offset in [0.0, 60, 120, 300] {
+            change = health.record(
+                .unresponsive, for: id, now: start.addingTimeInterval(offset),
+                isEnabled: true, autoMount: true
+            )
+        }
+        #expect(!change.shouldRepair)
+        #expect(health.missStreak(id) == 4)
+        #expect(health.isUnresponsive(id))
+
+        change = health.record(
+            .unresponsive, for: id, now: start.addingTimeInterval(600),
+            isEnabled: true, autoMount: true
+        )
+        #expect(change.shouldRepair)
+
+        health.resetCooldown(id)
+        #expect(health.canRepair(id, now: start))
     }
 
     @Test("a share that mounts by hand is never repaired")

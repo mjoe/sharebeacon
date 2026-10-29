@@ -74,6 +74,16 @@ final class SMBShareManager: NSObject {
     private let retryInterval: TimeInterval = 60
     private let reachabilityTimeout: TimeInterval = 120
     private let wakeGraceInterval: TimeInterval = 5
+    /// The path has to stay quiet this long after a wake before shares are
+    /// reconnected. Wi-Fi often reports "satisfied" before it can carry SMB.
+    private let wakeStableInterval: TimeInterval = 10
+    private let wakeMaximumWait: TimeInterval = 40
+    /// Path changes arrive in bursts. One check a few seconds after the last
+    /// change is enough.
+    private let networkChangeDebounce: TimeInterval = 3
+    /// The background cycle may probe every minute, the panel every ten
+    /// seconds. Fifteen seconds keeps the probes off the SMB client.
+    private let statusRefreshMinimumInterval: TimeInterval = 15
 
     @ObservationIgnored private var networkMonitor: NWPathMonitor?
     @ObservationIgnored private var retryTask: Task<Void, Never>?
@@ -81,10 +91,16 @@ final class SMBShareManager: NSObject {
     @ObservationIgnored private var operations: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var adoptedMountPoints: [UUID: String] = [:]
     @ObservationIgnored private var manuallyUnmounted: Set<UUID> = []
+    /// Mounts started by `repair`. They keep the repair cooldown; a mount the
+    /// user asks for clears it.
+    @ObservationIgnored private var repairMounts: Set<UUID> = []
     @ObservationIgnored private var isSleeping = false
     @ObservationIgnored private let operationRunner = MountOperationRunner()
     @ObservationIgnored private var statusTask: Task<Void, Never>?
-    @ObservationIgnored private var statusRefreshPending = false
+    @ObservationIgnored private var deferredStatusTask: Task<Void, Never>?
+    @ObservationIgnored private var lastStatusRefresh = Date.distantPast
+    @ObservationIgnored private var networkCheckTask: Task<Void, Never>?
+    @ObservationIgnored private var lastNetworkChange = Date.distantPast
     @ObservationIgnored private var trafficTask: Task<Void, Never>?
     @ObservationIgnored private var trafficSamplers = 0
     @ObservationIgnored private var panelRefreshTask: Task<Void, Never>?
@@ -116,6 +132,8 @@ final class SMBShareManager: NSObject {
         retryTask?.cancel()
         wakeTask?.cancel()
         statusTask?.cancel()
+        deferredStatusTask?.cancel()
+        networkCheckTask?.cancel()
         trafficTask?.cancel()
         operations.values.forEach { $0.cancel() }
         NSWorkspace.shared.notificationCenter.removeObserver(self)
@@ -252,11 +270,40 @@ final class SMBShareManager: NSObject {
     /// uses, the link a new connection would take, its free space and whether
     /// it still answers. A share that stops answering is repaired after
     /// `RepairPolicy` has seen enough misses in a row.
-    func refreshStatus() {
-        guard statusTask == nil else {
-            statusRefreshPending = true
+    ///
+    /// Automatic calls are throttled, because the panel asks every ten
+    /// seconds while a mount or a path change can ask at any time, and every
+    /// probe is a call into the SMB client. A call that arrives too early is
+    /// deferred instead of dropped, so the data still arrives.
+    func refreshStatus(force: Bool = false) {
+        guard !force else {
+            startStatusRefresh()
             return
         }
+        let elapsed = Date().timeIntervalSince(lastStatusRefresh)
+        guard statusTask == nil, elapsed >= statusRefreshMinimumInterval else {
+            scheduleStatusRefresh(after: max(statusRefreshMinimumInterval - elapsed, 0.5))
+            return
+        }
+        startStatusRefresh()
+    }
+
+    private func scheduleStatusRefresh(after delay: TimeInterval) {
+        guard deferredStatusTask == nil else { return }
+        deferredStatusTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled, let self else { return }
+            self.deferredStatusTask = nil
+            self.refreshStatus()
+        }
+    }
+
+    private func startStatusRefresh() {
+        guard statusTask == nil else {
+            scheduleStatusRefresh(after: 0.5)
+            return
+        }
+        lastStatusRefresh = Date()
         let targets = shares
             .filter { state(for: $0) == .mounted }
             .map { (id: $0.id, host: $0.host, path: mountPath(for: $0)) }
@@ -283,16 +330,13 @@ final class SMBShareManager: NSObject {
             guard let self else { return }
             statusTask = nil
             apply(report)
-            if statusRefreshPending {
-                statusRefreshPending = false
-                refreshStatus()
-            }
         }
     }
 
     private func apply(
         _ report: [UUID: (link: NetworkLink?, preferred: NetworkLink?, probe: VolumeProbe)]
     ) {
+        let now = Date()
         var stale: [ShareConfiguration] = []
         for share in shares {
             guard let entry = report[share.id] else { continue }
@@ -317,6 +361,7 @@ final class SMBShareManager: NSObject {
                 let change = health.record(
                     entry.probe,
                     for: share.id,
+                    now: now,
                     isEnabled: share.isEnabled,
                     autoMount: share.autoMount
                 )
@@ -331,6 +376,7 @@ final class SMBShareManager: NSObject {
                 let change = health.record(
                     entry.probe,
                     for: share.id,
+                    now: now,
                     isEnabled: share.isEnabled,
                     autoMount: share.autoMount
                 )
@@ -358,6 +404,7 @@ final class SMBShareManager: NSObject {
         }
         manuallyUnmounted.remove(share.id)
         health.clear(share.id)
+        health.resetCooldown(share.id)
         appendLog("Remounting \(share.name).")
         unmount(share, thenMount: share, evenWithoutAutoMount: true)
     }
@@ -368,7 +415,15 @@ final class SMBShareManager: NSObject {
     /// showing it as not responding.
     private func repair(_ share: ShareConfiguration) {
         guard state(for: share) == .mounted, operations[share.id] == nil else { return }
-        health.clear(share.id)
+        // The old probe no longer speaks for the share: a fresh session is
+        // about to replace it, and a probe that missed its deadline must not
+        // keep counting against the new one.
+        VolumeProber.clearStuck(path: mountPath(for: share))
+        health.noteRepair(
+            share.id,
+            now: Date(),
+            cooldown: health.policy.repairCooldown
+        )
         states[share.id] = .unmounting
         operations[share.id] = Task { [weak self] in
             guard let self else { return }
@@ -387,10 +442,26 @@ final class SMBShareManager: NSObject {
                     return
                 }
                 states[share.id] = current.isEnabled ? .unmounted : .disabled
+                repairMounts.insert(share.id)
                 mount(current, explicit: true)
+                repairMounts.remove(share.id)
             } catch {
                 operations[share.id] = nil
                 states[share.id] = .mounted
+                // A busy volume means a copy is running. Keep the longer
+                // pause and mark the share unresponsive again, so the panel
+                // does not claim it recovered just because unmounting failed.
+                health.noteRepair(
+                    share.id,
+                    now: Date(),
+                    cooldown: health.policy.busyCooldown
+                )
+                _ = health.record(
+                    .unresponsive,
+                    for: share.id,
+                    isEnabled: share.isEnabled,
+                    autoMount: share.autoMount
+                )
                 appendLog("\(share.name) is busy; left it mounted.", level: .warning)
             }
         }
@@ -421,7 +492,7 @@ final class SMBShareManager: NSObject {
     func startPanelRefresh() {
         guard panelRefreshTask == nil else { return }
         refreshMountStates()
-        refreshStatus()
+        refreshStatus(force: true)
         panelRefreshTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(10))
@@ -539,6 +610,9 @@ final class SMBShareManager: NSObject {
     func mount(_ share: ShareConfiguration, explicit: Bool = false) {
         manuallyUnmounted.remove(share.id)
         guard share.isEnabled, operations[share.id] == nil else { return }
+        if explicit && !repairMounts.contains(share.id) {
+            health.resetCooldown(share.id)
+        }
 
         let table = MountTable.current()
         if let existingPoint = table.mountPoint(host: share.host, share: share.shareName) {
@@ -619,7 +693,7 @@ final class SMBShareManager: NSObject {
                 try await operationRunner.mount(mounter, share: share, password: password)
                 states[share.id] = .mounted
                 appendLog("Mounted \(share.name) at \(share.normalizedMountPoint).")
-                refreshStatus()
+                refreshStatus(force: true)
                 if restoreFavoriteIfEnabled(for: share, at: nil) {
                     appendLog("Restored Finder favorite for \(share.name).")
                 }
@@ -756,8 +830,7 @@ final class SMBShareManager: NSObject {
             guard path.status == .satisfied else { return }
             Task { @MainActor in
                 guard let self, !self.isSleeping else { return }
-                self.appendLog("Network path changed; checking configured shares.")
-                self.mountAutoMountingShares()
+                self.scheduleNetworkCheck()
             }
         }
         monitor.start(queue: DispatchQueue(label: "org.mjoe.sharebeacon.network"))
@@ -789,6 +862,23 @@ final class SMBShareManager: NSObject {
         }
     }
 
+    /// Coalesces a burst of path changes into one check. While the wake task
+    /// runs it only records the change: that task waits for the path to settle
+    /// before it reconnects anything.
+    private func scheduleNetworkCheck() {
+        lastNetworkChange = Date()
+        guard wakeTask == nil else { return }
+        networkCheckTask?.cancel()
+        let debounce = networkChangeDebounce
+        networkCheckTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(debounce))
+            guard !Task.isCancelled, let self, !self.isSleeping else { return }
+            self.networkCheckTask = nil
+            self.appendLog("Network path changed; checking configured shares.")
+            self.mountAutoMountingShares()
+        }
+    }
+
     private func startRetryTask() {
         retryTask?.cancel()
         let retryInterval = self.retryInterval
@@ -807,21 +897,47 @@ final class SMBShareManager: NSObject {
         isSleeping = true
         retryTask?.cancel()
         wakeTask?.cancel()
+        wakeTask = nil
+        networkCheckTask?.cancel()
+        networkCheckTask = nil
+        deferredStatusTask?.cancel()
+        deferredStatusTask = nil
         operations.values.forEach { $0.cancel() }
         operations.removeAll()
         appendLog("Mac is sleeping; pausing share monitoring.")
     }
 
+    /// After a wake the path monitor often reports "satisfied" while Wi-Fi is
+    /// still associating or DHCP has not finished. Mounting into that window
+    /// fails and costs a reconnect, so this waits for the path to stay quiet
+    /// for `wakeStableInterval` before it touches a share.
     @objc private func didWake() {
         isSleeping = false
         appendLog("Mac woke from sleep; resuming share monitoring.")
         startRetryTask()
+        lastNetworkChange = Date()
         wakeTask?.cancel()
         wakeTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(self?.wakeGraceInterval ?? 5))
-            guard !Task.isCancelled else { return }
-            guard let self, !self.isSleeping else { return }
-            self.appendLog("Network grace period elapsed; reconnecting shares.")
+            defer { self?.wakeTask = nil }
+            let grace = self?.wakeGraceInterval ?? 5
+            try? await Task.sleep(for: .seconds(grace))
+            var waited = grace
+            while !Task.isCancelled, waited < (self?.wakeMaximumWait ?? 40) {
+                guard let self, !self.isSleeping else { return }
+                let quiet = Date().timeIntervalSince(self.lastNetworkChange)
+                if quiet >= self.wakeStableInterval {
+                    self.appendLog("Network path settled; reconnecting shares.")
+                    self.mountAutoMountingShares()
+                    return
+                }
+                try? await Task.sleep(for: .seconds(2))
+                waited += 2
+            }
+            guard !Task.isCancelled, let self, !self.isSleeping else { return }
+            self.appendLog(
+                "Network path did not settle; reconnecting shares anyway.",
+                level: .warning
+            )
             self.mountAutoMountingShares()
         }
     }
